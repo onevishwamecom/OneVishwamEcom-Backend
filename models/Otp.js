@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const { OTP_LENGTH } = require('../config/authConfig');
 
 const otpSchema = new mongoose.Schema({
   email: {
@@ -7,7 +8,6 @@ const otpSchema = new mongoose.Schema({
     required: true,
     lowercase: true,
     trim: true,
-    index: true,
   },
   otp: {
     type: String,
@@ -28,8 +28,16 @@ const otpSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+// Compound index for fast OTP lookups by email + usage status
+otpSchema.index({ email: 1, isUsed: 1, createdAt: -1 });
+
+// TTL index — MongoDB automatically deletes documents once expiresAt has passed
+otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
 otpSchema.statics.generateOtp = function () {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const max = Math.pow(10, OTP_LENGTH);
+  const min = Math.pow(10, OTP_LENGTH - 1);
+  return Math.floor(min + Math.random() * (max - min)).toString();
 };
 
 otpSchema.statics.hashOtp = function (otp) {

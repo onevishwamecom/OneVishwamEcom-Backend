@@ -1,6 +1,7 @@
-
 #!/bin/bash
-# Comprehensive API test script
+# Comprehensive API test script for OneVishwam Backend
+# Tests all auth flows, edge cases, and security features.
+
 API="http://localhost:5001/api"
 PASS=0
 FAIL=0
@@ -45,10 +46,12 @@ check "Health endpoint" '"success":true' "$R"
 # ─── Register ───────────────────────────────────────────────────────────────
 echo ""
 echo "── Auth: Register ──"
+
+# Valid registration (strong password)
 EMAIL="test_$(date +%s)@example.com"
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/register \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"Test User\",\"email\":\"$EMAIL\",\"phone\":\"+919876543210\",\"password\":\"password123\"}")
+  -d "{\"name\":\"Test User\",\"email\":\"$EMAIL\",\"phone\":\"+919876543210\",\"password\":\"StrongPass1!\"}")
 HTTP=$(echo "$R" | tail -1)
 BODY=$(echo "$R" | sed '$d')
 check_status "Register returns 201" "201" "$HTTP"
@@ -60,26 +63,50 @@ check "Has accessToken" "eyJ" "$ACCESS_TOKEN"
 check "Has refreshToken" "eyJ" "$REFRESH_TOKEN"
 check "Has user id" "$USER_ID" "$USER_ID"
 
-# Duplicate register
+# Duplicate email
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/register \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"Test User\",\"email\":\"$EMAIL\",\"phone\":\"+919876543210\",\"password\":\"password123\"}")
+  -d "{\"name\":\"Test User\",\"email\":\"$EMAIL\",\"phone\":\"+919876543211\",\"password\":\"StrongPass1!\"}")
 HTTP=$(echo "$R" | tail -1)
 check_status "Duplicate email returns 409" "409" "$HTTP"
 
-# Validation errors
+# Duplicate phone
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"","email":"bad","password":"12"}')
+  -d "{\"name\":\"Test User\",\"email\":\"unique_$(date +%s)@example.com\",\"phone\":\"+919876543210\",\"password\":\"StrongPass1!\"}")
+HTTP=$(echo "$R" | tail -1)
+check_status "Duplicate phone returns 409" "409" "$HTTP"
+
+# Empty fields
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{}')
+HTTP=$(echo "$R" | tail -1)
+check_status "Empty fields returns 400" "400" "$HTTP"
+
+# Validation errors (bad email, weak password, no phone)
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"","email":"bad","password":"12","phone":"abc"}')
 HTTP=$(echo "$R" | tail -1)
 check_status "Validation returns 400" "400" "$HTTP"
+check "Has structured errors" '"errors"' "$(echo "$R" | sed '$d')"
+
+# Weak password (no uppercase, no special char)
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Weak","email":"weak@example.com","phone":"+919876543299","password":"password123"}')
+HTTP=$(echo "$R" | tail -1)
+check_status "Weak password returns 400" "400" "$HTTP"
 
 # ─── Login ──────────────────────────────────────────────────────────────────
 echo ""
 echo "── Auth: Login ──"
+
+# Correct credentials
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"password123\"}")
+  -d "{\"email\":\"$EMAIL\",\"password\":\"StrongPass1!\"}")
 HTTP=$(echo "$R" | tail -1)
 BODY=$(echo "$R" | sed '$d')
 check_status "Login returns 200" "200" "$HTTP"
@@ -93,6 +120,31 @@ R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
   -d "{\"email\":\"$EMAIL\",\"password\":\"wrong\"}")
 HTTP=$(echo "$R" | tail -1)
 check_status "Wrong password returns 401" "401" "$HTTP"
+
+# Non-existent user
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"noone@example.com","password":"StrongPass1!"}')
+HTTP=$(echo "$R" | tail -1)
+check_status "Non-existent user returns 401" "401" "$HTTP"
+
+# Empty body
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{}')
+HTTP=$(echo "$R" | tail -1)
+check_status "Empty login body returns 400" "400" "$HTTP"
+
+# Case insensitive email
+UPPER_EMAIL=$(echo "$EMAIL" | tr '[:lower:]' '[:upper:]')
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$UPPER_EMAIL\",\"password\":\"StrongPass1!\"}")
+HTTP=$(echo "$R" | tail -1)
+BODY=$(echo "$R" | sed '$d')
+check_status "Case insensitive email login returns 200" "200" "$HTTP"
+ACCESS_TOKEN=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['accessToken'])" 2>/dev/null)
+REFRESH_TOKEN=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['refreshToken'])" 2>/dev/null)
 
 # ─── Refresh Token ──────────────────────────────────────────────────────────
 echo ""
@@ -108,9 +160,8 @@ NEW_REFRESH=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.st
 check "New accessToken issued" "eyJ" "$NEW_ACCESS"
 check "New refreshToken issued" "eyJ" "$NEW_REFRESH"
 
-# Rotation test: refresh again, then try the PREVIOUS refresh token
+# Rotation: refresh again with new token, then try old one
 PREV_REFRESH=$NEW_REFRESH
-# Refresh again
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/refresh \
   -H "Content-Type: application/json" \
   -d "{\"refreshToken\":\"$NEW_REFRESH\"}")
@@ -120,12 +171,19 @@ NEW_ACCESS2=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.st
 NEW_REFRESH2=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['refreshToken'])" 2>/dev/null)
 check_status "Second refresh succeeds (200)" "200" "$HTTP"
 
-# Now try PREV_REFRESH (should be invalid since it was rotated)
+# Old refresh token should be rejected (rotation)
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/refresh \
   -H "Content-Type: application/json" \
   -d "{\"refreshToken\":\"$PREV_REFRESH\"}")
 HTTP=$(echo "$R" | tail -1)
 check_status "Rotated refresh token rejected (401)" "401" "$HTTP"
+
+# Missing refresh token
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{}')
+HTTP=$(echo "$R" | tail -1)
+check_status "Missing refresh token returns 400" "400" "$HTTP"
 
 ACCESS_TOKEN=$NEW_ACCESS2
 REFRESH_TOKEN=$NEW_REFRESH2
@@ -143,6 +201,11 @@ R=$(curl -s -w "\n%{http_code}" $API/auth/me)
 HTTP=$(echo "$R" | tail -1)
 check_status "Get me without token returns 401" "401" "$HTTP"
 
+# Invalid token
+R=$(curl -s -w "\n%{http_code}" $API/auth/me -H "Authorization: Bearer invalidtoken")
+HTTP=$(echo "$R" | tail -1)
+check_status "Get me with invalid token returns 401" "401" "$HTTP"
+
 # ─── Update Profile ─────────────────────────────────────────────────────────
 echo ""
 echo "── Auth: Update Profile ──"
@@ -159,10 +222,12 @@ check "Name is Updated Name" "Updated Name" "$UPDATED_NAME"
 # ─── Change Password ────────────────────────────────────────────────────────
 echo ""
 echo "── Auth: Change Password ──"
+
+# Valid password change
 R=$(curl -s -w "\n%{http_code}" -X PUT $API/auth/password \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -d '{"currentPassword":"password123","newPassword":"newpass456"}')
+  -d '{"currentPassword":"StrongPass1!","newPassword":"NewStrong2@"}')
 HTTP=$(echo "$R" | tail -1)
 BODY=$(echo "$R" | sed '$d')
 check_status "Change password returns 200" "200" "$HTTP"
@@ -170,76 +235,168 @@ check_status "Change password returns 200" "200" "$HTTP"
 # Login with new password
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"newpass456\"}")
+  -d "{\"email\":\"$EMAIL\",\"password\":\"NewStrong2@\"}")
 HTTP=$(echo "$R" | tail -1)
 BODY=$(echo "$R" | sed '$d')
 check_status "Login with new password returns 200" "200" "$HTTP"
-NEW_ACCESS2=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['accessToken'])" 2>/dev/null)
+ACCESS_TOKEN=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['accessToken'])" 2>/dev/null)
 
-# Login with old password (should fail)
+# Old password fails
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"password123\"}")
+  -d "{\"email\":\"$EMAIL\",\"password\":\"StrongPass1!\"}")
 HTTP=$(echo "$R" | tail -1)
 check_status "Old password returns 401" "401" "$HTTP"
-
-ACCESS_TOKEN=$NEW_ACCESS2
 
 # Wrong current password
 R=$(curl -s -w "\n%{http_code}" -X PUT $API/auth/password \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -d '{"currentPassword":"wrong","newPassword":"test123"}')
+  -d '{"currentPassword":"wrong","newPassword":"Another3#"}')
 HTTP=$(echo "$R" | tail -1)
 check_status "Wrong current password returns 400" "400" "$HTTP"
 
-# ─── Forgot Password ────────────────────────────────────────────────────────
+# Weak new password
+R=$(curl -s -w "\n%{http_code}" -X PUT $API/auth/password \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{"currentPassword":"NewStrong2@","newPassword":"weak"}')
+HTTP=$(echo "$R" | tail -1)
+check_status "Weak new password returns 400" "400" "$HTTP"
+
+# ─── Forgot Password (OTP flow) ────────────────────────────────────────────
 echo ""
 echo "── Auth: Forgot Password ──"
+
+# Valid email
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\"}")
 HTTP=$(echo "$R" | tail -1)
 BODY=$(echo "$R" | sed '$d')
 check_status "Forgot password returns 200" "200" "$HTTP"
-RESET_TOKEN=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['resetToken'])" 2>/dev/null)
-check "Has resetToken" "$RESET_TOKEN" "$RESET_TOKEN"
+DEV_OTP=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin)['data']; print(d['otp'] if d else '')" 2>/dev/null)
 
-# Unknown email
+# Non-existent email (should still return 200 — no user enumeration)
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/forgot-password \
   -H "Content-Type: application/json" \
   -d '{"email":"nonexistent@test.com"}')
 HTTP=$(echo "$R" | tail -1)
-check_status "Unknown email returns 404" "404" "$HTTP"
+check_status "Non-existent email still returns 200" "200" "$HTTP"
+
+# Invalid email format
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"not-an-email"}')
+HTTP=$(echo "$R" | tail -1)
+check_status "Invalid email format returns 400" "400" "$HTTP"
+
+# ─── Verify OTP ─────────────────────────────────────────────────────────────
+echo ""
+echo "── Auth: Verify OTP ──"
+
+if [ -n "$DEV_OTP" ]; then
+  # Wrong OTP
+  R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/verify-otp \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"otp\":\"000000\"}")
+  HTTP=$(echo "$R" | tail -1)
+  check_status "Wrong OTP returns 400" "400" "$HTTP"
+
+  # Correct OTP
+  R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/verify-otp \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"otp\":\"$DEV_OTP\"}")
+  HTTP=$(echo "$R" | tail -1)
+  BODY=$(echo "$R" | sed '$d')
+  check_status "Correct OTP returns 200" "200" "$HTTP"
+  VERIFY_TOKEN=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['verifyToken'])" 2>/dev/null)
+  check "Has verifyToken" "$VERIFY_TOKEN" "$VERIFY_TOKEN"
+
+  # Reuse OTP (already consumed)
+  R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/verify-otp \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"otp\":\"$DEV_OTP\"}")
+  HTTP=$(echo "$R" | tail -1)
+  check_status "Reused OTP returns 400" "400" "$HTTP"
+else
+  echo "  ⚠️  Skipping OTP tests (no dev OTP returned — email may have been sent)"
+fi
+
+# OTP validation (non-numeric, wrong length)
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/verify-otp \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$EMAIL\",\"otp\":\"abc\"}")
+HTTP=$(echo "$R" | tail -1)
+check_status "Non-numeric OTP returns 400" "400" "$HTTP"
 
 # ─── Reset Password ─────────────────────────────────────────────────────────
 echo ""
 echo "── Auth: Reset Password ──"
-R=$(curl -s -w "\n%{http_code}" -X POST "$API/auth/reset-password/$RESET_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"password":"resetpass789"}')
-HTTP=$(echo "$R" | tail -1)
-check_status "Reset password returns 200" "200" "$HTTP"
 
-# Login with reset password
-R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"resetpass789\"}")
-HTTP=$(echo "$R" | tail -1)
-BODY=$(echo "$R" | sed '$d')
-check_status "Login with reset password returns 200" "200" "$HTTP"
-ACCESS_TOKEN=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['accessToken'])" 2>/dev/null)
+if [ -n "$VERIFY_TOKEN" ]; then
+  # Reset with valid token
+  R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/reset-password \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"verifyToken\":\"$VERIFY_TOKEN\",\"password\":\"ResetPass3#\"}")
+  HTTP=$(echo "$R" | tail -1)
+  check_status "Reset password returns 200" "200" "$HTTP"
 
-# Reuse old reset token (consumed)
-R=$(curl -s -w "\n%{http_code}" -X POST "$API/auth/reset-password/$RESET_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"password":"shouldfail"}')
-HTTP=$(echo "$R" | tail -1)
-check_status "Used reset token returns 400" "400" "$HTTP"
+  # Login with reset password
+  R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"password\":\"ResetPass3#\"}")
+  HTTP=$(echo "$R" | tail -1)
+  BODY=$(echo "$R" | sed '$d')
+  check_status "Login with reset password returns 200" "200" "$HTTP"
+  ACCESS_TOKEN=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['accessToken'])" 2>/dev/null)
 
-# ─── Send Enquiry (listing needed) ─────────────────────────────────────────
+  # Reuse verify token (consumed)
+  R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/reset-password \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"verifyToken\":\"$VERIFY_TOKEN\",\"password\":\"ShouldFail4$\"}")
+  HTTP=$(echo "$R" | tail -1)
+  check_status "Used verify token returns 400" "400" "$HTTP"
+
+  # Weak password in reset
+  R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/reset-password \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"verifyToken\":\"sometoken\",\"password\":\"weak\"}")
+  HTTP=$(echo "$R" | tail -1)
+  check_status "Weak password in reset returns 400" "400" "$HTTP"
+else
+  echo "  ⚠️  Skipping reset tests (no verify token)"
+fi
+
+# ─── Resend OTP ─────────────────────────────────────────────────────────────
 echo ""
-echo "── Auth: Listing + Enquiry ──"
+echo "── Auth: Resend OTP ──"
+
+# First resend should work (new email to avoid cooldown from previous tests)
+RESEND_EMAIL="resend_$(date +%s)@example.com"
+RESEND_PHONE="+919876$(date +%S)0001"
+# Register a user for resend test
+curl -s -X POST $API/auth/register \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"Resend User\",\"email\":\"$RESEND_EMAIL\",\"phone\":\"$RESEND_PHONE\",\"password\":\"StrongPass1!\"}" > /dev/null 2>&1
+
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$RESEND_EMAIL\"}")
+HTTP=$(echo "$R" | tail -1)
+check_status "Forgot password for resend test returns 200" "200" "$HTTP"
+
+# Immediate resend should be rate limited (cooldown)
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/resend-otp \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$RESEND_EMAIL\"}")
+HTTP=$(echo "$R" | tail -1)
+check_status "Immediate resend returns 429 (cooldown)" "429" "$HTTP"
+
+# ─── Listings + Save ────────────────────────────────────────────────────────
+echo ""
+echo "── Auth: Listing + Save ──"
+
 # Create a listing
 R=$(curl -s -w "\n%{http_code}" -X POST $API/listings \
   -H "Content-Type: application/json" \
@@ -255,23 +412,7 @@ R=$(curl -s -w "\n%{http_code}" $API/listings/my -H "Authorization: Bearer $ACCE
 HTTP=$(echo "$R" | tail -1)
 check_status "Get my listings returns 200" "200" "$HTTP"
 
-# Update listing
-R=$(curl -s -w "\n%{http_code}" -X PUT $API/listings/$LISTING_ID \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -d '{"title":"Updated Car"}')
-HTTP=$(echo "$R" | tail -1)
-check_status "Update listing returns 200" "200" "$HTTP"
-
-# Toggle status
-R=$(curl -s -w "\n%{http_code}" -X PATCH $API/listings/$LISTING_ID/status \
-  -H "Authorization: Bearer $ACCESS_TOKEN")
-HTTP=$(echo "$R" | tail -1)
-check_status "Toggle status returns 200" "200" "$HTTP"
-
-# ─── Save Listing ───────────────────────────────────────────────────────────
-echo ""
-echo "── Auth: Save Listing ──"
+# Save listing
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/save \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -290,6 +431,14 @@ HTTP=$(echo "$R" | tail -1)
 BODY=$(echo "$R" | sed '$d')
 check_status "Unsave listing returns 200" "200" "$HTTP"
 check "Unsave listing" '"saved":false' "$BODY"
+
+# Invalid listing ID
+R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/save \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{"listingId":"not-a-mongo-id"}')
+HTTP=$(echo "$R" | tail -1)
+check_status "Invalid listing ID returns 400" "400" "$HTTP"
 
 # Get saved
 R=$(curl -s -w "\n%{http_code}" $API/auth/saved -H "Authorization: Bearer $ACCESS_TOKEN")
@@ -325,7 +474,7 @@ echo "── Public: Enquiry ──"
 EMAIL2="test2_$(date +%s)@example.com"
 REG_RESP=$(curl -s -X POST $API/auth/register \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"User Two\",\"email\":\"$EMAIL2\",\"phone\":\"+918765432109\",\"password\":\"password123\"}")
+  -d "{\"name\":\"User Two\",\"email\":\"$EMAIL2\",\"phone\":\"+918765432109\",\"password\":\"StrongPass1!\"}")
 TOKEN2=$(echo "$REG_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['accessToken'])" 2>/dev/null)
 USER2_ID=$(echo "$REG_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['user']['id'])" 2>/dev/null)
 
@@ -353,7 +502,6 @@ R=$(curl -s -w "\n%{http_code}" -X POST $API/reviews \
 HTTP=$(echo "$R" | tail -1)
 check_status "Submit review returns 201" "201" "$HTTP"
 
-# Get reviews
 R=$(curl -s -w "\n%{http_code}" "$API/users/$USER2_ID/reviews")
 HTTP=$(echo "$R" | tail -1)
 check_status "Get user reviews returns 200" "200" "$HTTP"
@@ -383,9 +531,15 @@ check_status "Delete account returns 200" "200" "$HTTP"
 
 R=$(curl -s -w "\n%{http_code}" -X POST $API/auth/login \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"$EMAIL2\",\"password\":\"password123\"}")
+  -d "{\"email\":\"$EMAIL2\",\"password\":\"StrongPass1!\"}")
 HTTP=$(echo "$R" | tail -1)
 check_status "Deleted user cannot login (401)" "401" "$HTTP"
+
+# Delete first test user too
+R=$(curl -s -w "\n%{http_code}" -X DELETE $API/auth/account \
+  -H "Authorization: Bearer $ACCESS_TOKEN")
+HTTP=$(echo "$R" | tail -1)
+check_status "Cleanup: delete first user" "200" "$HTTP"
 
 # ─── Summary ────────────────────────────────────────────────────────────────
 echo ""

@@ -6,6 +6,62 @@ const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendPasswordResetOtp } = require('../utils/sendEmail');
+const {
+  PASSWORD_REGEX,
+  PASSWORD_RULES_MESSAGE,
+  OTP_EXPIRY_MINUTES,
+  OTP_MAX_ATTEMPTS,
+  OTP_RESEND_COOLDOWN_SECONDS,
+  RESET_TOKEN_EXPIRY_MINUTES,
+} = require('../config/authConfig');
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Generates an OTP, stores the hash in the database, and attempts to email it.
+ * Shared by forgotPassword and resendOtp to eliminate code duplication.
+ */
+const generateAndSendOtp = async (email) => {
+  const normalizedEmail = email.toLowerCase();
+
+  // Invalidate any existing unused OTPs for this email
+  await Otp.updateMany({ email: normalizedEmail, isUsed: false }, { isUsed: true });
+
+  const otp = Otp.generateOtp();
+  const hashedOtp = Otp.hashOtp(otp);
+
+  await Otp.create({
+    email: normalizedEmail,
+    otp: hashedOtp,
+    expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
+  });
+
+  let emailed = false;
+  try {
+    await sendPasswordResetOtp(email, otp);
+    emailed = true;
+  } catch {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEV] OTP for ${email}: ${otp}`);
+    }
+  }
+
+  // Only expose OTP in dev mode when email delivery failed (for testing)
+  const devPayload = process.env.NODE_ENV === 'development' && !emailed ? { otp } : undefined;
+  return devPayload;
+};
+
+/**
+ * Validates password strength against the centralized policy.
+ * Throws ApiError if the password does not meet requirements.
+ */
+const validatePasswordStrength = (password) => {
+  if (!PASSWORD_REGEX.test(password)) {
+    throw new ApiError(400, PASSWORD_RULES_MESSAGE);
+  }
+};
+
+// ── Controllers ────────────────────────────────────────────────────────────
 
 const register = asyncHandler(async (req, res) => {
   const { name, email, phone, password } = req.body;
@@ -83,15 +139,18 @@ const updateProfile = asyncHandler(async (req, res) => {
 
 const changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword } = req.body;
+
   const user = await User.findById(req.user._id).select('+password');
   if (!user) throw new ApiError(404, 'User not found');
 
   const isMatch = await user.comparePassword(currentPassword);
   if (!isMatch) throw new ApiError(400, 'Current password is incorrect');
 
+  validatePasswordStrength(newPassword);
+
   user.password = newPassword;
   await user.save();
-  
+
   const { accessToken, refreshToken } = await user.generateAuthResponse();
 
   new ApiResponse(200, { accessToken, refreshToken }, 'Password changed successfully').send(res);
@@ -102,30 +161,13 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {
+    // Return same response for non-existent emails to prevent user enumeration
     return new ApiResponse(200, null, 'If an account exists for this email, a verification code has been sent.').send(res);
   }
 
-  await Otp.updateMany({ email: email.toLowerCase(), isUsed: false }, { isUsed: true });
+  const devPayload = await generateAndSendOtp(email);
 
-  const otp = Otp.generateOtp();
-  const hashedOtp = Otp.hashOtp(otp);
-
-  await Otp.create({
-    email: email.toLowerCase(),
-    otp: hashedOtp,
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-  });
-
-  let emailed = false;
-  try {
-    await sendPasswordResetOtp(email, otp);
-    emailed = true;
-  } catch (err) {
-    console.log(`[DEV] OTP for ${email}: ${otp}`);
-  }
-
-  const payload = process.env.NODE_ENV === 'development' && !emailed ? { otp } : undefined;
-  new ApiResponse(200, payload, 'If an account exists for this email, a verification code has been sent.').send(res);
+  new ApiResponse(200, devPayload, 'If an account exists for this email, a verification code has been sent.').send(res);
 });
 
 const verifyOtp = asyncHandler(async (req, res) => {
@@ -140,7 +182,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'No verification code found. Please request a new code.');
   }
 
-  if (otpRecord.attempts >= 5) {
+  if (otpRecord.attempts >= OTP_MAX_ATTEMPTS) {
     otpRecord.isUsed = true;
     await otpRecord.save();
     throw new ApiError(400, 'Too many failed attempts. Please request a new code.');
@@ -169,7 +211,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
   if (!user) throw new ApiError(404, 'User not found');
 
   user.resetPasswordToken = hashedVerifyToken;
-  user.resetPasswordExpire = Date.now() + 5 * 60 * 1000;
+  user.resetPasswordExpire = Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000;
   await user.save({ validateBeforeSave: false });
 
   new ApiResponse(200, { verifyToken, message: 'Email verified successfully' }, 'OTP verified').send(res);
@@ -183,27 +225,19 @@ const resendOtp = asyncHandler(async (req, res) => {
     return new ApiResponse(200, null, 'If an account exists for this email, a verification code has been sent.').send(res);
   }
 
-  await Otp.updateMany({ email: email.toLowerCase(), isUsed: false }, { isUsed: true });
-
-  const otp = Otp.generateOtp();
-  const hashedOtp = Otp.hashOtp(otp);
-
-  await Otp.create({
-    email: email.toLowerCase(),
-    otp: hashedOtp,
-    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-  });
-
-  let emailed = false;
-  try {
-    await sendPasswordResetOtp(email, otp);
-    emailed = true;
-  } catch (err) {
-    console.log(`[DEV] New OTP for ${email}: ${otp}`);
+  // Enforce cooldown — reject if the last OTP was sent less than N seconds ago
+  const lastOtp = await Otp.findOne({ email: email.toLowerCase() }).sort({ createdAt: -1 });
+  if (lastOtp) {
+    const secondsSinceLast = (Date.now() - lastOtp.createdAt.getTime()) / 1000;
+    if (secondsSinceLast < OTP_RESEND_COOLDOWN_SECONDS) {
+      const waitSeconds = Math.ceil(OTP_RESEND_COOLDOWN_SECONDS - secondsSinceLast);
+      throw new ApiError(429, `Please wait ${waitSeconds} seconds before requesting a new code.`);
+    }
   }
 
-  const payload = process.env.NODE_ENV === 'development' && !emailed ? { otp } : undefined;
-  new ApiResponse(200, payload, 'A new verification code has been sent to your email.').send(res);
+  const devPayload = await generateAndSendOtp(email);
+
+  new ApiResponse(200, devPayload, 'A new verification code has been sent to your email.').send(res);
 });
 
 const resetPasswordWithOtp = asyncHandler(async (req, res) => {
@@ -218,12 +252,7 @@ const resetPasswordWithOtp = asyncHandler(async (req, res) => {
 
   if (!user) throw new ApiError(400, 'Invalid or expired verification. Please start the password reset process again.');
 
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_\-+=<>?/{}[\]~|]).{8,}$/;
-  if (!passwordRegex.test(password)) {
-    throw new ApiError(400,
-      'Password must be at least 8 characters and contain an uppercase letter, a lowercase letter, a number, and a special character.'
-    );
-  }
+  validatePasswordStrength(password);
 
   user.password = password;
   user.resetPasswordToken = undefined;
@@ -239,6 +268,9 @@ const resetPasswordWithOtp = asyncHandler(async (req, res) => {
 const deleteAccount = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
   if (!user) throw new ApiError(404, 'User not found');
+
+  // Clean up orphaned OTPs for this user's email
+  await Otp.deleteMany({ email: user.email });
 
   await user.deleteOne();
   new ApiResponse(200, null, 'Account deleted permanently').send(res);

@@ -1,11 +1,17 @@
 const { validationResult } = require('express-validator');
-const ApiError = require('../utils/ApiError');
 
 const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    const messages = errors.array().map((e) => e.msg);
-    throw new ApiError(400, messages.join(', '));
+    const fieldErrors = errors.array().map((e) => ({
+      field: e.path,
+      message: e.msg,
+    }));
+    return res.status(400).json({
+      success: false,
+      message: fieldErrors.map((e) => e.message).join(', '),
+      errors: fieldErrors,
+    });
   }
   next();
 };
