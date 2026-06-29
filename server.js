@@ -14,7 +14,9 @@ const PORT = process.env.PORT || 5000;
 
 // Security
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-const corsOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map(s => s.trim());
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+  : (process.env.NODE_ENV === 'development' ? true : 'http://localhost:5173');
 app.use(cors({ origin: corsOrigins, credentials: true }));
 
 const limiter = rateLimit({
