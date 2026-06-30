@@ -4,8 +4,8 @@ const enquirySchema = new mongoose.Schema(
   {
     listing: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Listing',
-      required: [true, 'Listing is required'],
+      ref: 'Property',
+      required: [true, 'Property is required'],
     },
     fromUser: {
       type: mongoose.Schema.Types.ObjectId,

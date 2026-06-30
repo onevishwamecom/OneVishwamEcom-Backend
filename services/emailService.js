@@ -7,15 +7,19 @@ try {
 
 const sendEmail = async (options) => {
   if (!nodemailer) {
-    throw new Error('Nodemailer is not installed. Email sending is unavailable.');
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEV EMAIL] To: ${options.email} | Subject: ${options.subject}`);
+      return;
+    }
+    throw new Error('Email service unavailable - nodemailer not installed');
   }
 
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT, 10) || 587,
+    host: process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com',
+    port: parseInt(process.env.BREVO_SMTP_PORT, 10) || 587,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: process.env.BREVO_SMTP_USER || process.env.SMTP_USER,
+      pass: process.env.BREVO_SMTP_PASS || process.env.SMTP_PASS,
     },
   });
 
@@ -29,7 +33,7 @@ const sendEmail = async (options) => {
   await transporter.sendMail(message);
 };
 
-const sendPasswordResetOtp = async (email, otp) => {
+const sendOtpEmail = async (email, otp) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e5e7eb;">
       <div style="text-align: center; margin-bottom: 24px;">
@@ -58,11 +62,7 @@ const sendPasswordResetOtp = async (email, otp) => {
     </div>
   `;
 
-  await sendEmail({
-    email,
-    subject: 'Reset Your OneVishwam Password',
-    html,
-  });
+  await sendEmail({ email, subject: 'Reset Your OneVishwam Password', html });
 };
 
-module.exports = { sendEmail, sendPasswordResetOtp };
+module.exports = { sendEmail, sendOtpEmail };
