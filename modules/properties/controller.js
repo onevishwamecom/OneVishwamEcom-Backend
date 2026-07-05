@@ -1,6 +1,39 @@
+const Property = require('./model');
+const createCRUDController = require('../baseController');
 const ApiResponse = require('../../utils/ApiResponse');
 const asyncHandler = require('../../utils/asyncHandler');
 const propertyService = require('./propertyService');
+
+const NUMERIC_FIELDS = ['bedrooms', 'balconies', 'floors', 'totalFloors', 'areaSize', 'projectCount', 'totalUnits', 'availableUnits'];
+
+function extractNumber(val) {
+  if (val == null || val === '') return undefined;
+  if (typeof val === 'number') return val;
+  const m = String(val).match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function sanitizeNumericFields(data) {
+  for (const field of NUMERIC_FIELDS) {
+    if (field in data) {
+      data[field] = extractNumber(data[field]);
+    }
+  }
+  return data;
+}
+
+const base = createCRUDController({
+  model: Property,
+  ownerField: 'user',
+  defaultFilter: { status: { $ne: 'deleted' } },
+  searchFields: ['title', 'description', 'city', 'area', 'location', 'propertyType', 'subtitle'],
+  rangeFilters: {
+    numericPrice: { min: 'priceMin', max: 'priceMax' },
+    numericArea: { min: 'areaMin', max: 'areaMax' },
+  },
+  transformCreateData: (req, data) => sanitizeNumericFields({ ...data, subtitle: data.subtitle || data.title }),
+  transformUpdateData: (req, data) => sanitizeNumericFields(data),
+});
 
 const getAll = asyncHandler(async (req, res) => {
   const result = await propertyService.getAll(req.query);
@@ -27,15 +60,9 @@ const getSimilar = asyncHandler(async (req, res) => {
   new ApiResponse(200, result, 'Similar properties fetched').send(res);
 });
 
-const create = asyncHandler(async (req, res) => {
-  const result = await propertyService.create(req.body, req.files, req.user._id);
-  new ApiResponse(201, result, 'Property created successfully').send(res);
-});
+const create = base.create;
 
-const update = asyncHandler(async (req, res) => {
-  const result = await propertyService.update(req.params.id, req.body, req.files, req.user._id, req.user.role);
-  new ApiResponse(200, result, 'Property updated successfully').send(res);
-});
+const update = base.update;
 
 const remove = asyncHandler(async (req, res) => {
   await propertyService.remove(req.params.id, req.user._id, req.user.role);

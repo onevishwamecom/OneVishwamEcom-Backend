@@ -30,6 +30,25 @@ GET /api/product/vehicles         → modules/vehicles/routes.js
 
 The `modules/index.js` registry auto-mounts all modules.
 
+### Generic CRUD factory
+All modules except `properties` use `createCRUDController()` from `modules/baseController.js` for standard CRUD (list, get, create, update, delete, my listings). The factory accepts options for search fields, range filters, sort defaults, and — most importantly — `transformCreateData` / `transformUpdateData` hooks that let each module customize data before it hits the model, without writing a custom service layer. The `properties` module uses the same factory for its create and update operations while retaining a custom service layer for property-specific features (featured, latest, similar, soft-delete, toggle status, view tracking).
+
+### BaseController Factory
+`modules/baseController.js` exports `createCRUDController(options)` — a factory that generates standard CRUD handlers. Configuration options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `model` | Mongoose Model | required | The model to perform CRUD on |
+| `searchFields` | `string[]` | `[]` | Fields searched by `?q=` keyword |
+| `rangeFilters` | `object` | `{}` | Maps model fields to `{min, max}` query params (e.g. `{ numericPrice: { min: 'priceMin', max: 'priceMax' } }`) |
+| `defaultSort` | `object` | `{ createdAt: -1 }` | Default sort |
+| `defaultFilter` | `object` | `{ status: 'available' }` | Always-applied filter |
+| `ownerField` | `string` | `'user'` | Field linking items to their owner |
+| `transformCreateData` | `(req, data) => data` | — | Hook to transform data before creating |
+| `transformUpdateData` | `(req, item) => item` | — | Hook to transform data before updating |
+
+Returns `{ getAll, getById, getMy, create, update, remove }`.
+
 ### v1 API prefix
 Auth and user endpoints use `/api/v1/` prefix. The property module also provides dedicated endpoints under `/api/v1/properties/` with richer functionality (featured, latest, similar, toggle status, my listings).
 
@@ -72,9 +91,9 @@ backend/
 │
 ├── modules/
 │   ├── index.js                    # Module registry: { id, model, routes }[]
-│   ├── baseController.js           # CRUD factory for standard modules
+│   ├── baseController.js           # CRUD factory (search, range, sort, paginate, transform hooks)
 │   │
-│   ├── properties/                 # Full-featured (service, controller, routes, validator)
+│   ├── properties/                 # CRUD factory + custom service (featured, similar, toggle)
 │   ├── vehicles/                   # Standard CRUD via baseController
 │   ├── groceries/                  # Standard CRUD via baseController
 │   ├── garments/                   # Standard CRUD via baseController

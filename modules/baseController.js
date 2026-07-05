@@ -9,6 +9,8 @@ function createCRUDController({
   defaultSort = { createdAt: -1 },
   defaultFilter = { status: 'available' },
   ownerField = 'user',
+  transformCreateData,
+  transformUpdateData,
 }) {
 
   function buildFilter(query) {
@@ -98,9 +100,12 @@ function createCRUDController({
   });
 
   const create = asyncHandler(async (req, res) => {
-    const data = { ...req.body, [ownerField]: req.user._id };
+    let data = { ...req.body, [ownerField]: req.user._id };
     if (req.files && req.files.length > 0) {
       data.images = req.files.map(f => f.path && f.path.startsWith('http') ? f.path : (f.cloudinaryUrl || `/uploads/${f.filename}`));
+    }
+    if (transformCreateData) {
+      data = await transformCreateData(req, data);
     }
     const item = await model.create(data);
     new ApiResponse(201, { item }, 'Created successfully').send(res);
@@ -117,6 +122,10 @@ function createCRUDController({
       req.body.images = req.body.replaceImages === 'true' ? newImages : [...(item.images || []), ...newImages];
     }
     Object.assign(item, req.body);
+    if (transformUpdateData) {
+      const transformed = await transformUpdateData(req, item);
+      Object.assign(item, transformed);
+    }
     await item.save();
     new ApiResponse(200, { item }, 'Updated successfully').send(res);
   });

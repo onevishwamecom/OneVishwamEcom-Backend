@@ -73,7 +73,6 @@ All 6 services expose identical CRUD endpoints. Replace `:service` with one of:
 |---|--------|----------|------|-------------|
 | 22 | GET | `/api/product/:service` | - | List items (filterable, sortable, paginated) |
 | 23 | GET | `/api/product/:service/:id` | - | Get single item by ID |
-| 24 | POST | `/api/product/:service` | Yes | Create new item |
 | 25 | PUT | `/api/product/:service/:id` | Yes | Update item (owner or admin) |
 | 26 | DELETE | `/api/product/:service/:id` | Yes | Delete item (owner or admin) |
 
