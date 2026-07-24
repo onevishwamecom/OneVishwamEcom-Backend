@@ -79,4 +79,17 @@ const getMyProperties = asyncHandler(async (req, res) => {
   new ApiResponse(200, result, 'Your properties fetched').send(res);
 });
 
-module.exports = { getAll, getById, getFeatured, getLatest, getSimilar, create, update, remove, toggleStatus, getMyProperties };
+const uploadBrochure = asyncHandler(async (req, res) => {
+  const property = await Property.findById(req.params.id);
+  if (!property) throw new ApiError(404, 'Property not found');
+  if (property.user && req.user._id.toString() !== property.user.toString() && req.user.role !== 'admin') {
+    throw new ApiError(403, 'Not authorized');
+  }
+  if (!req.file) throw new ApiError(400, 'No PDF file provided');
+  const url = req.file.path && req.file.path.startsWith('http') ? req.file.path : (req.file.cloudinaryUrl || `/uploads/${req.file.filename}`);
+  property.brochure = url;
+  await property.save();
+  new ApiResponse(200, { brochure: url }, 'Brochure uploaded successfully').send(res);
+});
+
+module.exports = { getAll, getById, getFeatured, getLatest, getSimilar, create, update, remove, toggleStatus, getMyProperties, uploadBrochure };

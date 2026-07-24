@@ -2,10 +2,11 @@ const express = require('express');
 const { protect, adminOnly, optionalAuth } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const upload = require('../../middleware/upload');
+const uploadBrochure = require('../../middleware/uploadBrochure');
 const { createRules, updateRules } = require('./validator');
 const {
   getAll, getById, getFeatured, getLatest, getSimilar,
-  create, update, remove, toggleStatus, getMyProperties,
+  create, update, remove, toggleStatus, getMyProperties, uploadBrochure: uploadBrochureHandler,
 } = require('./controller');
 
 const router = express.Router();
@@ -21,5 +22,6 @@ router.post('/', protect, upload.array('images', 10), createRules, validate, cre
 router.put('/:id', protect, upload.array('images', 10), updateRules, validate, update);
 router.delete('/:id', protect, remove);
 router.patch('/:id/status', protect, toggleStatus);
+router.post('/:id/brochure', protect, uploadBrochure.single('brochure'), uploadBrochureHandler);
 
 module.exports = router;
