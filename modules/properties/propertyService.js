@@ -113,7 +113,7 @@ const getById = async (id) => {
     { new: true }
   );
   if (!property) throw new ApiError(404, 'Property not found');
-  return { property };
+  return property;
 };
 
 const getFeatured = async () => {
@@ -163,7 +163,7 @@ const create = async (data, files, userId) => {
   }
 
   const property = await Property.create(payload);
-  return { property };
+  return property;
 };
 
 const update = async (id, data, files, userId, userRole) => {
@@ -189,7 +189,7 @@ const update = async (id, data, files, userId, userRole) => {
 
   Object.assign(property, data);
   await property.save();
-  return { property };
+  return property;
 };
 
 const remove = async (id, userId, userRole) => {
@@ -215,13 +215,13 @@ const toggleStatus = async (id, userId, userRole) => {
   const statusFlow = { active: 'inactive', inactive: 'active' };
   property.status = statusFlow[property.status] || 'active';
   await property.save();
-  return { property };
+  return property;
 };
 
 const getMyProperties = async (userId) => {
   const items = await Property.find({ user: userId, status: { $ne: 'deleted' } })
     .sort({ createdAt: -1 });
-  return { items };
+  return items;
 };
 
 module.exports = { getAll, getById, getFeatured, getLatest, getSimilar, create, update, remove, toggleStatus, getMyProperties };

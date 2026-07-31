@@ -41,8 +41,8 @@ const getAll = asyncHandler(async (req, res) => {
 });
 
 const getById = asyncHandler(async (req, res) => {
-  const result = await propertyService.getById(req.params.id);
-  new ApiResponse(200, result, 'Property fetched successfully').send(res);
+  const item = await propertyService.getById(req.params.id);
+  new ApiResponse(200, { item }, 'Property fetched successfully').send(res);
 });
 
 const getFeatured = asyncHandler(async (req, res) => {
@@ -70,13 +70,13 @@ const remove = asyncHandler(async (req, res) => {
 });
 
 const toggleStatus = asyncHandler(async (req, res) => {
-  const result = await propertyService.toggleStatus(req.params.id, req.user._id, req.user.role);
-  new ApiResponse(200, result, 'Property status updated').send(res);
+  const item = await propertyService.toggleStatus(req.params.id, req.user._id, req.user.role);
+  new ApiResponse(200, { item }, 'Property status updated').send(res);
 });
 
 const getMyProperties = asyncHandler(async (req, res) => {
-  const result = await propertyService.getMyProperties(req.user._id);
-  new ApiResponse(200, result, 'Your properties fetched').send(res);
+  const items = await propertyService.getMyProperties(req.user._id);
+  new ApiResponse(200, { items }, 'Your properties fetched').send(res);
 });
 
 const uploadBrochure = asyncHandler(async (req, res) => {
