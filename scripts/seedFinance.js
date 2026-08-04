@@ -48,7 +48,7 @@ const services = [
     features: ['100% property value funding', 'No CIBIL check', 'No Income Tax Return required', 'Maximum ₹3 Crore', '30-year tenure', 'Instant provisional approval', 'Zero prepayment penalty', 'Balance transfer available'],
     area: 'Indiranagar',
     pincode: '560038',
-    contactPhone: '1800-123-4567',
+    contactPhone: '93648 62542',
     contactEmail: 'ceo@onevishwam.com',
     serviceMode: 'Both',
     postedBy: 'Bank',
