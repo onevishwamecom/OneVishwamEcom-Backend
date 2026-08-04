@@ -49,7 +49,7 @@ const services = [
     area: 'Indiranagar',
     pincode: '560038',
     contactPhone: '1800-123-4567',
-    contactEmail: 'homeloan@onevishwam.com',
+    contactEmail: 'ceo@onevishwam.com',
     serviceMode: 'Both',
     postedBy: 'Bank',
     availability: 'Available Now',
