@@ -1,16 +1,46 @@
 const { body } = require('express-validator');
 
+const FINANCE_CATEGORIES = [
+  'Home Loans', 'Personal Loans', 'Vehicle Loans', 'Business Loans', 'Gold Loans',
+  'Education Loans', 'Insurance', 'Investment Services', 'Credit Cards', 'Financial Advisors',
+];
+
 const createRules = [
-  body('title').trim().notEmpty().withMessage('Title is required').isLength({ max: 200 }),
-  body('price').trim().notEmpty().withMessage('Price is required'),
+  body('companyName').trim().notEmpty().withMessage('Company name is required'),
+  body('category').trim().notEmpty().withMessage('Category is required').isIn(FINANCE_CATEGORIES).withMessage('Invalid category'),
+  body('description').trim().notEmpty().withMessage('Description is required'),
   body('city').trim().notEmpty().withMessage('City is required'),
-  body('category').optional().trim(),
-  body('interestRate').optional().isFloat({ min: 0, max: 100 }),
+  body('contactPhone').trim().notEmpty().withMessage('Phone number is required').custom((value) => {
+    const digits = String(value).replace(/[^0-9]/g, '');
+    if (digits.length !== 10) throw new Error('Phone number must have 10 digits');
+    return true;
+  }),
+  body('contactEmail').trim().notEmpty().withMessage('Email is required').isEmail().withMessage('Invalid email address'),
+  body('serviceName').optional().trim(),
+  body('providerType').optional().trim(),
+  body('interestRate').optional().trim(),
+  body('minAmount').optional().trim(),
+  body('maxAmount').optional().trim(),
   body('tenure').optional().trim(),
+  body('pincode').optional({ values: 'falsy' }).matches(/^\d{6}$/).withMessage('Pincode must be 6 digits'),
+  body('serviceMode').optional().isIn(['Online', 'Offline', 'Both']).withMessage('Invalid service mode'),
+  body('postedBy').optional().isIn(['Bank', 'Agent', 'Financial Consultant']).withMessage('Invalid postedBy value'),
+  body('availability').optional().isIn(['Available Now', 'Appointment Required']).withMessage('Invalid availability value'),
 ];
 
 const updateRules = [
-  body('title').optional().trim().notEmpty().withMessage('Title cannot be empty'),
+  body('companyName').optional().trim().notEmpty().withMessage('Company name cannot be empty'),
+  body('category').optional().trim().isIn(FINANCE_CATEGORIES).withMessage('Invalid category'),
+  body('contactPhone').optional().custom((value) => {
+    const digits = String(value).replace(/[^0-9]/g, '');
+    if (digits.length !== 10) throw new Error('Phone number must have 10 digits');
+    return true;
+  }),
+  body('contactEmail').optional().isEmail().withMessage('Invalid email address'),
+  body('pincode').optional({ values: 'falsy' }).matches(/^\d{6}$/).withMessage('Pincode must be 6 digits'),
+  body('serviceMode').optional().isIn(['Online', 'Offline', 'Both']).withMessage('Invalid service mode'),
+  body('postedBy').optional().isIn(['Bank', 'Agent', 'Financial Consultant']).withMessage('Invalid postedBy value'),
+  body('availability').optional().isIn(['Available Now', 'Appointment Required']).withMessage('Invalid availability value'),
 ];
 
 module.exports = { createRules, updateRules };

@@ -85,7 +85,7 @@ function createCRUDController({
       ]);
     }
 
-    new ApiResponse(200, { items, pagination: buildPagination(page, limit, total), filters: req.query }, 'Fetched successfully').send(res);
+    new ApiResponse(200, { items, pagination: buildPagination(page, limit, total) }, 'Fetched successfully').send(res);
   });
 
   const getById = asyncHandler(async (req, res) => {
