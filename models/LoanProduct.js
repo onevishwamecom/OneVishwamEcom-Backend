@@ -23,6 +23,8 @@ const loanProductSchema = new mongoose.Schema(
     eligibility: [String],
     documents: [String],
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+    contactPhone: { type: String, trim: true },
+    contactEmail: { type: String, trim: true },
   },
   { timestamps: true }
 );

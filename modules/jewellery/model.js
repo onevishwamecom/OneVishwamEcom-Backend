@@ -5,6 +5,8 @@ const storeSchema = new mongoose.Schema({
   city: { type: String, trim: true },
   pincode: { type: String, trim: true, match: [/^\d{6}$/, 'Pincode must be 6 digits'] },
   address: { type: String, trim: true },
+  contactPhone: { type: String, trim: true },
+  contactEmail: { type: String, trim: true },
 }, { _id: false });
 
 const jewellerySchema = new mongoose.Schema({

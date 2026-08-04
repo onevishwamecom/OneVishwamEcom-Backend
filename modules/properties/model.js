@@ -42,6 +42,8 @@ const propertySchema = new mongoose.Schema({
   images: { type: [String], default: [] },
   brochure: { type: String, default: '' },
   contact: { type: String, trim: true },
+  contactPhone: { type: String, trim: true },
+  contactEmail: { type: String, trim: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   agent: {
     name: { type: String, trim: true },

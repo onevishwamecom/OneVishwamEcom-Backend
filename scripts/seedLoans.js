@@ -16,6 +16,8 @@ const loans = [
     eligibility: ['Salaried / Self-employed individuals', 'Age: 21 – 65 years', 'Minimum income: ₹25,000/month', 'CIBIL Score: 650+'],
     documents: ['Aadhaar Card', 'PAN Card', 'Income Proof (6 months)', 'Bank Statements (6 months)', 'Property Documents'],
     status: 'active',
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
   },
   {
     name: 'Vehicle Loan',
@@ -30,6 +32,8 @@ const loans = [
     eligibility: ['Salaried / Self-employed individuals', 'Age: 21 – 60 years', 'Minimum income: ₹15,000/month', 'CIBIL Score: 600+'],
     documents: ['Aadhaar Card', 'PAN Card', 'Income Proof', 'Vehicle Quotation', 'Bank Statements'],
     status: 'active',
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
   },
   {
     name: 'Personal Loan',
@@ -44,6 +48,8 @@ const loans = [
     eligibility: ['Salaried individuals', 'Age: 23 – 58 years', 'Minimum income: ₹20,000/month', 'CIBIL Score: 700+'],
     documents: ['Aadhaar Card', 'PAN Card', 'Salary Slips (3 months)', 'Bank Statements (3 months)'],
     status: 'active',
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
   },
   {
     name: 'Business Loan',
@@ -58,6 +64,8 @@ const loans = [
     eligibility: ['Business owner / Proprietor', 'Business vintage: 1+ years', 'ITR filed for 1+ years', 'CIBIL Score: 650+'],
     documents: ['Aadhaar Card', 'PAN Card', 'Business Proof', 'ITR (2 years)', 'Bank Statements (6 months)', 'GST Returns'],
     status: 'active',
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
   },
   {
     name: 'Education Loan',
@@ -72,6 +80,8 @@ const loans = [
     eligibility: ['Student age: 18 – 35 years', 'Admission to recognized institution', 'Co-applicant required', 'Indian resident'],
     documents: ['Admission Letter', 'Fee Structure', 'Student KYC', 'Co-applicant KYC', 'Co-applicant Income Proof'],
     status: 'active',
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
   },
 ];
 

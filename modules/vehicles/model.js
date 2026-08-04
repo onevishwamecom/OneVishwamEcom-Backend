@@ -24,6 +24,8 @@ const vehicleSchema = new mongoose.Schema({
   city: { type: String, required: true, lowercase: true, trim: true, index: true },
   pincode: { type: String, required: true, trim: true, match: [/^\d{6}$/, 'Pincode must be 6 digits'] },
   showroom: { type: showroomSchema, default: null },
+  contactPhone: { type: String, trim: true },
+  contactEmail: { type: String, trim: true },
   loanApproved: { type: Boolean, default: false, index: true },
   featured: { type: Boolean, default: false, index: true },
   variants: { type: Number, default: 1 },

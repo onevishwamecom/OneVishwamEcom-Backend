@@ -18,6 +18,8 @@ const properties = [
     pincode: '560066', country: 'India', state: 'Karnataka',
     loanApproved: true, status: 'active',
     projectCount: 120, totalUnits: 120, availableUnits: 5,
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
     agent: {
       name: 'Vinay Manoj Gagat',
       type: 'SY EXPERT',
@@ -44,6 +46,8 @@ const properties = [
     pincode: '560066', country: 'India', state: 'Karnataka',
     loanApproved: false, status: 'active',
     projectCount: 1, totalUnits: 50, availableUnits: 3,
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
     agent: {
       name: 'Regus',
       type: 'PRO AGENT',
@@ -69,6 +73,8 @@ const properties = [
     pincode: '560035', country: 'India', state: 'Karnataka',
     loanApproved: true, status: 'active',
     projectCount: 24, totalUnits: 24, availableUnits: 2,
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
     agent: {
       name: 'Priya Sharma',
       type: 'VILLA EXPERT',
@@ -95,6 +101,8 @@ const properties = [
     pincode: '560102', country: 'India', state: 'Karnataka',
     loanApproved: false, status: 'active',
     projectCount: 200, totalUnits: 200, availableUnits: 8,
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
     agent: {
       name: 'Ankit Verma',
       type: 'RENTAL EXPERT',
@@ -121,6 +129,8 @@ const properties = [
     pincode: '560038', country: 'India', state: 'Karnataka',
     loanApproved: true, status: 'active',
     projectCount: 1, totalUnits: 1, availableUnits: 1,
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
     agent: {
       name: 'Aditya Roy',
       type: 'LUXURY EXPERT',
@@ -147,6 +157,8 @@ const properties = [
     pincode: '560001', country: 'India', state: 'Karnataka',
     loanApproved: false, status: 'inactive',
     projectCount: 1, totalUnits: 15, availableUnits: 0,
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
     agent: {
       name: 'Deepak Mehta',
       type: 'COMMERCIAL EXPERT',
@@ -173,6 +185,8 @@ const properties = [
     pincode: '560035', country: 'India', state: 'Karnataka',
     loanApproved: true, status: 'active',
     projectCount: 1, totalUnits: 5, availableUnits: 5,
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
     agent: {
       name: 'Ravi Kumar',
       type: 'LAND EXPERT',
@@ -199,6 +213,8 @@ const properties = [
     pincode: '560064', country: 'India', state: 'Karnataka',
     loanApproved: true, status: 'active',
     projectCount: 1, totalUnits: 1, availableUnits: 1,
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
     agent: {
       name: 'Suresh Patel',
       type: 'LAND EXPERT',
@@ -224,6 +240,8 @@ const properties = [
     pincode: '560064', country: 'India', state: 'Karnataka',
     loanApproved: false, status: 'active',
     projectCount: 1, totalUnits: 1, availableUnits: 0,
+    contactPhone: '9364862542',
+    contactEmail: 'ceo@onevishwam.com',
     agent: {
       name: 'Neha Joshi',
       type: 'FARM EXPERT',
