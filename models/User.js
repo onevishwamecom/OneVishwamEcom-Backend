@@ -57,6 +57,10 @@ const userSchema = new mongoose.Schema(
     resetPasswordToken: String,
     resetPasswordExpire: Date,
     savedListings: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Property' }],
+    notifications: {
+      email: { type: Boolean, default: false },
+      whatsapp: { type: Boolean, default: false },
+    },
   },
   { timestamps: true }
 );
@@ -101,6 +105,10 @@ userSchema.methods.toProfileJSON = function () {
     accountStatus: this.accountStatus,
     lastLogin: this.lastLogin,
     createdAt: this.createdAt,
+    notifications: {
+      email: this.notifications?.email ?? false,
+      whatsapp: this.notifications?.whatsapp ?? false,
+    },
   };
 };
 

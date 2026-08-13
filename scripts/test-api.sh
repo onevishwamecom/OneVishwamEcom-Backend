@@ -196,6 +196,32 @@ check_status "Profile update returns 200" "200" "$HTTP"
 UPDATED_NAME=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['user']['fullName'])" 2>/dev/null)
 check "Name is Updated Name" "Updated Name" "$UPDATED_NAME"
 
+# ─── Notification Preferences ─────────────────────────────────────────────────
+echo ""
+echo "── Auth: Notification Preferences ──"
+R=$(curl -s -w "\n%{http_code}" -X PUT $API/v1/auth/profile \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{"notifications":{"email":true,"whatsapp":false}}')
+HTTP=$(echo "$R" | tail -1)
+BODY=$(echo "$R" | sed '$d')
+check_status "Notification update returns 200" "200" "$HTTP"
+EMAIL_NOTIF=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['user']['notifications']['email'])" 2>/dev/null)
+check "notifications.email is true" "True" "$EMAIL_NOTIF"
+
+# Verify the preference is returned on /me
+R=$(curl -s $API/auth/me -H "Authorization: Bearer $ACCESS_TOKEN")
+WA_NOTIF=$(echo "$R" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['user']['notifications']['whatsapp'])" 2>/dev/null)
+check "notifications.whatsapp persists as false" "False" "$WA_NOTIF"
+
+# Invalid boolean should fail validation
+R=$(curl -s -w "\n%{http_code}" -X PUT $API/v1/auth/profile \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{"notifications":{"email":"not-a-bool"}}')
+HTTP=$(echo "$R" | tail -1)
+check_status "Invalid notification.email value returns 400" "400" "$HTTP"
+
 # ─── Forgot Password (OTP flow) ────────────────────────────────────────────
 echo ""
 echo "── Auth: Forgot Password ──"

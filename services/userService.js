@@ -13,6 +13,11 @@ const updateProfile = async (userId, updates) => {
     data.profileImage = updates.profileImage;
   }
 
+  if (updates.notifications && typeof updates.notifications === 'object') {
+    if (typeof updates.notifications.email === 'boolean') data['notifications.email'] = updates.notifications.email;
+    if (typeof updates.notifications.whatsapp === 'boolean') data['notifications.whatsapp'] = updates.notifications.whatsapp;
+  }
+
   if (data.mobile) {
     const existingMobile = await User.findOne({ mobile: data.mobile, _id: { $ne: userId } });
     if (existingMobile) throw new ApiError(409, 'Mobile number already registered');

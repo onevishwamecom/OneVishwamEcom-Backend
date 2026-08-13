@@ -13,6 +13,7 @@ const login = asyncHandler(async (req, res) => {
 });
 
 const logout = asyncHandler(async (req, res) => {
+  await authService.logout(req.body);
   new ApiResponse(200, null, 'Logged out successfully').send(res);
 });
 
@@ -41,4 +42,24 @@ const getMe = asyncHandler(async (req, res) => {
   new ApiResponse(200, { user }).send(res);
 });
 
-module.exports = { register, login, logout, forgotPassword, verifyOtp, resendOtp, resetPassword, getMe };
+const refresh = asyncHandler(async (req, res) => {
+  const result = await authService.refresh(req.body);
+  new ApiResponse(200, result, 'Token refreshed successfully').send(res);
+});
+
+const updateProfile = asyncHandler(async (req, res) => {
+  const user = await authService.updateProfile(req.user._id, req.body);
+  new ApiResponse(200, { user }, 'Profile updated').send(res);
+});
+
+const changePassword = asyncHandler(async (req, res) => {
+  const result = await authService.changePassword(req.user._id, req.body);
+  new ApiResponse(200, result, 'Password changed successfully').send(res);
+});
+
+const deleteAccount = asyncHandler(async (req, res) => {
+  await authService.deleteAccount(req.user._id);
+  new ApiResponse(200, null, 'Account deleted successfully').send(res);
+});
+
+module.exports = { register, login, logout, forgotPassword, verifyOtp, resendOtp, resetPassword, getMe, refresh, updateProfile, changePassword, deleteAccount };

@@ -51,4 +51,23 @@ const resetPasswordRules = [
     .custom((val, { req }) => val === req.body.password).withMessage('Passwords do not match'),
 ];
 
-module.exports = { registerRules, loginRules, forgotPasswordRules, verifyOtpRules, resendOtpRules, resetPasswordRules };
+const updateProfileRules = [
+  body('fullName').optional().trim()
+    .isLength({ min: NAME_MIN_LENGTH, max: NAME_MAX_LENGTH })
+    .withMessage(`Name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`),
+  body('mobile').optional().trim().matches(PHONE_REGEX).withMessage('Invalid mobile number'),
+  body('city').optional().trim(),
+  body('area').optional().trim(),
+  body('pincode').optional().trim().matches(/^\d{6}$/).withMessage('Pincode must be 6 digits'),
+  body('profileImage').optional().trim().isURL().withMessage('Invalid image URL'),
+  body('notifications').optional().isObject().withMessage('Notifications must be an object'),
+  body('notifications.email').optional().isBoolean().withMessage('notifications.email must be a boolean'),
+  body('notifications.whatsapp').optional().isBoolean().withMessage('notifications.whatsapp must be a boolean'),
+];
+
+const changePasswordRules = [
+  body('currentPassword').notEmpty().withMessage('Current password is required'),
+  passwordField('newPassword'),
+];
+
+module.exports = { registerRules, loginRules, forgotPasswordRules, verifyOtpRules, resendOtpRules, resetPasswordRules, updateProfileRules, changePasswordRules };

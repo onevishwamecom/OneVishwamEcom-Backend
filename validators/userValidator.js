@@ -9,6 +9,9 @@ const updateProfileRules = [
   body('city').optional().trim(),
   body('area').optional().trim(),
   body('pincode').optional().trim().matches(/^\d{6}$/).withMessage('Pincode must be 6 digits'),
+  body('notifications').optional().isObject().withMessage('Notifications must be an object'),
+  body('notifications.email').optional().isBoolean().withMessage('notifications.email must be a boolean'),
+  body('notifications.whatsapp').optional().isBoolean().withMessage('notifications.whatsapp must be a boolean'),
 ];
 
 module.exports = { updateProfileRules };

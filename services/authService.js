@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const otpService = require('./otpService');
@@ -119,4 +120,96 @@ const getMe = async (userId) => {
   return user.toProfileJSON();
 };
 
-module.exports = { register, login, forgotPassword, verifyOtp, resendOtp, resetPassword, getMe };
+const logout = async ({ refreshToken }) => {
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    return;
+  }
+  try {
+    const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
+    const user = await User.findById(payload.id).select('+refreshToken');
+    if (user && user.refreshToken === refreshToken) {
+      user.refreshToken = undefined;
+      await user.save({ validateBeforeSave: false });
+    }
+  } catch {
+    // Token already invalid/reused; nothing to revoke
+  }
+};
+
+const updateProfile = async (userId, updates) => {
+  const allowed = ['fullName', 'mobile', 'city', 'area', 'pincode'];
+  const data = {};
+  for (const key of allowed) {
+    if (updates[key] !== undefined) data[key] = updates[key];
+  }
+  if (updates.profileImage !== undefined) data.profileImage = updates.profileImage;
+
+  if (updates.notifications && typeof updates.notifications === 'object') {
+    if (typeof updates.notifications.email === 'boolean') data['notifications.email'] = updates.notifications.email;
+    if (typeof updates.notifications.whatsapp === 'boolean') data['notifications.whatsapp'] = updates.notifications.whatsapp;
+  }
+
+  if (data.mobile) {
+    const existingMobile = await User.findOne({ mobile: data.mobile, _id: { $ne: userId } });
+    if (existingMobile) throw new ApiError(409, 'Mobile number already registered');
+  }
+
+  const user = await User.findByIdAndUpdate(userId, data, { new: true, runValidators: true });
+  if (!user) throw new ApiError(404, 'User not found');
+  return user.toProfileJSON();
+};
+
+const changePassword = async (userId, { currentPassword, newPassword }) => {
+  const user = await User.findById(userId).select('+password');
+  if (!user) throw new ApiError(404, 'User not found');
+
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) throw new ApiError(400, 'Current password is incorrect');
+
+  user.password = newPassword;
+  user.refreshToken = undefined;
+  await user.save();
+
+  return user.generateAuthResponse();
+};
+
+const deleteAccount = async (userId) => {
+  const user = await User.findById(userId);
+  if (!user) throw new ApiError(404, 'User not found');
+  await user.deleteOne();
+};
+
+const refresh = async ({ refreshToken }) => {
+  if (!refreshToken || typeof refreshToken !== 'string') {
+    throw new ApiError(401, 'Refresh token is required');
+  }
+
+  let payload;
+  try {
+    payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
+  } catch {
+    throw new ApiError(401, 'Invalid or expired refresh token');
+  }
+
+  const user = await User.findById(payload.id).select('+refreshToken');
+  if (!user) throw new ApiError(401, 'User not found');
+
+  if (user.refreshToken !== refreshToken) {
+    user.refreshToken = undefined;
+    await user.save({ validateBeforeSave: false });
+    throw new ApiError(401, 'Refresh token reuse detected. All sessions have been revoked. Please log in again.');
+  }
+
+  if (user.accountStatus !== 'active') {
+    throw new ApiError(403, 'Account is suspended. Please contact support.');
+  }
+
+  const accessToken = user.generateAccessToken();
+  const newRefreshToken = user.generateRefreshToken();
+  user.refreshToken = newRefreshToken;
+  await user.save({ validateBeforeSave: false });
+
+  return { accessToken, refreshToken: newRefreshToken, user: user.toProfileJSON() };
+};
+
+module.exports = { register, login, logout, forgotPassword, verifyOtp, resendOtp, resetPassword, getMe, refresh, updateProfile, changePassword, deleteAccount };

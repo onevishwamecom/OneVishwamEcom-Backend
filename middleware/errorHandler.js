@@ -42,10 +42,20 @@ const errorHandler = (err, req, res, next) => {
     message = 'Unexpected file field';
   }
 
+  // Rate limit errors
+  if (err.name === 'RateLimitError' || err.statusCode === 429) {
+    statusCode = err.statusCode || 429;
+    message = err.message || 'Too many requests, please try again later';
+  }
+
+  if (err.statusCode >= 500) {
+    // Log full error server-side for debugging
+    console.error(`[ERROR] ${req.method} ${req.originalUrl}`, err);
+  }
+
   res.status(statusCode).json({
     success: false,
     message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 };
 

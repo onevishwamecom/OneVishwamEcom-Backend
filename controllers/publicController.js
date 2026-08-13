@@ -1,5 +1,5 @@
 const Property = require('../modules/properties/model');
-const LoanProduct = require('../models/LoanProduct');
+const FinanceOffering = require('../modules/financeOfferings/model');
 const Enquiry = require('../models/Enquiry');
 const Review = require('../models/Review');
 const ApiError = require('../utils/ApiError');
@@ -7,10 +7,12 @@ const ApiResponse = require('../utils/ApiResponse');
 const asyncHandler = require('../utils/asyncHandler');
 
 const getBankLoans = asyncHandler(async (req, res) => {
-  const { type } = req.query;
+  const { type, limit } = req.query;
   const filter = { status: 'active' };
   if (type) filter.type = type;
-  const loans = await LoanProduct.find(filter).sort({ interestRate: 1 });
+  const query = FinanceOffering.find(filter).sort({ order: 1, createdAt: -1 });
+  if (limit) query.limit(Number(limit));
+  const loans = await query;
   new ApiResponse(200, { loans }).send(res);
 });
 
