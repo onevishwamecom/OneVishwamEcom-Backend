@@ -5,7 +5,6 @@ const storeSchema = new mongoose.Schema({
   city: { type: String, trim: true },
   pincode: { type: String, trim: true, match: [/^\d{6}$/, 'Pincode must be 6 digits'] },
   address: { type: String, trim: true },
-  contactPhone: { type: String, trim: true },
   contactEmail: { type: String, trim: true },
 }, { _id: false });
 
@@ -30,7 +29,7 @@ const jewellerySchema = new mongoose.Schema({
   description: { type: String, maxlength: 5000 },
   gemstone: { type: String, trim: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
-  status: { type: String, enum: ['active', 'inactive', 'sold'], default: 'active', index: true },
+  status: { type: String, enum: ['active', 'inactive', 'sold', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'active', index: true },
   featured: { type: Boolean, default: false, index: true },
 }, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
 

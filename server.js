@@ -19,12 +19,12 @@ const corsOrigins = process.env.CORS_ORIGIN
   : (process.env.NODE_ENV === 'development' ? true : 'http://localhost:5173');
 app.use(cors({ origin: corsOrigins, credentials: true }));
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { success: false, message: 'Too many requests, please try again later' },
-});
-app.use('/api/auth', limiter);
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 100,
+//   message: { success: false, message: 'Too many requests, please try again later' },
+// });
+// app.use('/api/auth', limiter);
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));

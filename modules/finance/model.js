@@ -24,12 +24,11 @@ const financeSchema = new mongoose.Schema({
   city: { type: String, required: true, lowercase: true, trim: true, index: true },
   area: { type: String, trim: true, index: true },
   pincode: { type: String, trim: true, match: [/^\d{6}$/, 'Pincode must be 6 digits'] },
-  contactPhone: { type: String, required: true, trim: true },
   contactEmail: { type: String, required: true, lowercase: true, trim: true },
   serviceMode: { type: String, trim: true },
   postedBy: { type: String, trim: true },
   availability: { type: String, trim: true },
-  status: { type: String, enum: ['active', 'inactive'], default: 'active', index: true },
+  status: { type: String, enum: ['active', 'inactive', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'active', index: true },
   featured: { type: Boolean, default: false, index: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
 }, {

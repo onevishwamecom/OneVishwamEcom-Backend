@@ -251,7 +251,6 @@ function toVehicle(doc) {
     city: String(doc.location || '').toLowerCase(),
     pincode: doc.pincode,
     showroom: doc.showroom || null,
-    contactPhone: doc.showroom?.phone || '',
     loanApproved: doc.loanApproved || false,
     featured: doc.featured || false,
     variants: doc.variants || 1,

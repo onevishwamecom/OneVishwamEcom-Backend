@@ -35,7 +35,7 @@ const errorHandler = (err, req, res, next) => {
   // Multer errors
   if (err.code === 'LIMIT_FILE_SIZE') {
     statusCode = 400;
-    message = 'File too large. Maximum size is 5MB.';
+    message = 'File too large. Please upload a smaller file.';
   }
   if (err.code === 'LIMIT_UNEXPECTED_FILE') {
     statusCode = 400;

@@ -1,6 +1,7 @@
 const ApiResponse = require('../utils/ApiResponse');
 const asyncHandler = require('../utils/asyncHandler');
 const authService = require('../services/authService');
+const listerService = require('../services/listerService');
 
 const register = asyncHandler(async (req, res) => {
   const result = await authService.register(req.body);
@@ -38,8 +39,8 @@ const resetPassword = asyncHandler(async (req, res) => {
 });
 
 const getMe = asyncHandler(async (req, res) => {
-  const user = await authService.getMe(req.user._id);
-  new ApiResponse(200, { user }).send(res);
+  const account = await authService.getMe(req.auth);
+  new ApiResponse(200, req.auth.accountType === 'lister' ? { lister: account } : { user: account }).send(res);
 });
 
 const refresh = asyncHandler(async (req, res) => {
@@ -48,8 +49,13 @@ const refresh = asyncHandler(async (req, res) => {
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
-  const user = await authService.updateProfile(req.user._id, req.body);
-  new ApiResponse(200, { user }, 'Profile updated').send(res);
+  if (req.auth.accountType === 'lister') {
+    const lister = await listerService.updateListerProfile(req.auth.id, req.body);
+    new ApiResponse(200, { lister }, 'Profile updated').send(res);
+  } else {
+    const user = await authService.updateProfile(req.auth.id, req.body);
+    new ApiResponse(200, { user }, 'Profile updated').send(res);
+  }
 });
 
 const changePassword = asyncHandler(async (req, res) => {

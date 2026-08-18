@@ -23,7 +23,7 @@ const jewellery = [
       'https://images.unsplash.com/photo-1605100804763-247f67b3557e?auto=format&fit=crop&w=800&q=80',
       'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=800&q=80',
     ],
-    store: { name: 'Vishwam Jewellers', city: 'Bangalore', pincode: '560001', address: 'Commercial Street, Bangalore - 560001', contactPhone: '9364862542', contactEmail: 'ceo@onevishwam.com' },
+    store: { name: 'Vishwam Jewellers', city: 'Bangalore', pincode: '560001', address: 'Commercial Street, Bangalore - 560001', contactEmail: 'ceo@onevishwam.com' },
     status: 'active',
     featured: false,
   },
@@ -46,7 +46,7 @@ const jewellery = [
     images: [
       'https://images.pexels.com/photos/20768279/pexels-photo-20768279.jpeg?auto=format&fit=crop&w=800&q=80',
     ],
-    store: { name: 'Diamonds by Vishwam', city: 'Bangalore', pincode: '560001', address: 'MG Road, Bangalore - 560001', contactPhone: '9364862542', contactEmail: 'ceo@onevishwam.com' },
+    store: { name: 'Diamonds by Vishwam', city: 'Bangalore', pincode: '560001', address: 'MG Road, Bangalore - 560001', contactEmail: 'ceo@onevishwam.com' },
     status: 'active',
     featured: false,
   },
@@ -69,7 +69,7 @@ const jewellery = [
     images: [
       'https://images.pexels.com/photos/7679824/pexels-photo-7679824.jpeg?auto=format&fit=crop&w=800&q=80',
     ],
-    store: { name: 'Vishwam Jewellers', city: 'Mysore', pincode: '570001', address: 'Devaraja Market, Mysore - 570001', contactPhone: '9364862542', contactEmail: 'ceo@onevishwam.com' },
+    store: { name: 'Vishwam Jewellers', city: 'Mysore', pincode: '570001', address: 'Devaraja Market, Mysore - 570001', contactEmail: 'ceo@onevishwam.com' },
     status: 'active',
     featured: false,
   },
@@ -92,7 +92,7 @@ const jewellery = [
     images: [
       'https://images.pexels.com/photos/13292955/pexels-photo-13292955.jpeg?auto=format&fit=crop&w=800&q=80',
     ],
-    store: { name: 'Platinum Gallery', city: 'Bangalore', pincode: '560038', address: 'Indiranagar, Bangalore - 560038', contactPhone: '9364862542', contactEmail: 'ceo@onevishwam.com' },
+    store: { name: 'Platinum Gallery', city: 'Bangalore', pincode: '560038', address: 'Indiranagar, Bangalore - 560038', contactEmail: 'ceo@onevishwam.com' },
     status: 'active',
     featured: false,
   },
@@ -115,7 +115,7 @@ const jewellery = [
     images: [
       'https://images.unsplash.com/photo-1608042314453-ae338d80c427?auto=format&fit=crop&w=800&q=80',
     ],
-    store: { name: 'Vishwam Jewellers', city: 'Bangalore', pincode: '560011', address: 'Jayanagar, Bangalore - 560011', contactPhone: '9364862542', contactEmail: 'ceo@onevishwam.com' },
+    store: { name: 'Vishwam Jewellers', city: 'Bangalore', pincode: '560011', address: 'Jayanagar, Bangalore - 560011', contactEmail: 'ceo@onevishwam.com' },
     status: 'active',
     featured: false,
   },
@@ -138,7 +138,7 @@ const jewellery = [
     images: [
       'https://images.pexels.com/photos/4889719/pexels-photo-4889719.jpeg?auto=format&fit=crop&w=800&q=80',
     ],
-    store: { name: 'Vishwam Bridal Collection', city: 'Bangalore', pincode: '560003', address: 'Malleswaram, Bangalore - 560003', contactPhone: '9364862542', contactEmail: 'ceo@onevishwam.com' },
+    store: { name: 'Vishwam Bridal Collection', city: 'Bangalore', pincode: '560003', address: 'Malleswaram, Bangalore - 560003', contactEmail: 'ceo@onevishwam.com' },
     status: 'active',
     featured: true,
   },
@@ -161,7 +161,7 @@ const jewellery = [
     images: [
       'https://images.pexels.com/photos/17368716/pexels-photo-17368716.jpeg?auto=format&fit=crop&w=800&q=80',
     ],
-    store: { name: 'Heritage Jewels', city: 'Mysore', pincode: '570005', address: 'Chamrajpura, Mysore - 570005', contactPhone: '9364862542', contactEmail: 'ceo@onevishwam.com' },
+    store: { name: 'Heritage Jewels', city: 'Mysore', pincode: '570005', address: 'Chamrajpura, Mysore - 570005', contactEmail: 'ceo@onevishwam.com' },
     status: 'active',
     featured: false,
   },
@@ -184,7 +184,7 @@ const jewellery = [
     images: [
       'https://images.pexels.com/photos/34372550/pexels-photo-34372550.jpeg?auto=format&fit=crop&w=800&q=80',
     ],
-    store: { name: 'Vishwam Jewellers', city: 'Bangalore', pincode: '560102', address: 'HSR Layout, Bangalore - 560102', contactPhone: '9364862542', contactEmail: 'ceo@onevishwam.com' },
+    store: { name: 'Vishwam Jewellers', city: 'Bangalore', pincode: '560102', address: 'HSR Layout, Bangalore - 560102', contactEmail: 'ceo@onevishwam.com' },
     status: 'active',
     featured: false,
   },

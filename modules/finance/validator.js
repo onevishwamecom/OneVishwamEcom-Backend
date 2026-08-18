@@ -10,11 +10,6 @@ const createRules = [
   body('category').trim().notEmpty().withMessage('Category is required').isIn(FINANCE_CATEGORIES).withMessage('Invalid category'),
   body('description').trim().notEmpty().withMessage('Description is required'),
   body('city').trim().notEmpty().withMessage('City is required'),
-  body('contactPhone').trim().notEmpty().withMessage('Phone number is required').custom((value) => {
-    const digits = String(value).replace(/[^0-9]/g, '');
-    if (digits.length !== 10) throw new Error('Phone number must have 10 digits');
-    return true;
-  }),
   body('contactEmail').trim().notEmpty().withMessage('Email is required').isEmail().withMessage('Invalid email address'),
   body('serviceName').optional().trim(),
   body('providerType').optional().trim(),
@@ -31,11 +26,6 @@ const createRules = [
 const updateRules = [
   body('companyName').optional().trim().notEmpty().withMessage('Company name cannot be empty'),
   body('category').optional().trim().isIn(FINANCE_CATEGORIES).withMessage('Invalid category'),
-  body('contactPhone').optional().custom((value) => {
-    const digits = String(value).replace(/[^0-9]/g, '');
-    if (digits.length !== 10) throw new Error('Phone number must have 10 digits');
-    return true;
-  }),
   body('contactEmail').optional().isEmail().withMessage('Invalid email address'),
   body('pincode').optional({ values: 'falsy' }).matches(/^\d{6}$/).withMessage('Pincode must be 6 digits'),
   body('serviceMode').optional().isIn(['Online', 'Offline', 'Both']).withMessage('Invalid service mode'),

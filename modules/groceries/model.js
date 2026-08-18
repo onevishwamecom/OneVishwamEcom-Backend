@@ -15,7 +15,7 @@ const grocerySchema = new mongoose.Schema({
   organic: { type: Boolean, default: false },
   discount: { type: Number, default: 0, min: 0, max: 100 },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  status: { type: String, enum: ['available', 'out-of-stock', 'discontinued'], default: 'available', index: true },
+  status: { type: String, enum: ['available', 'out-of-stock', 'discontinued', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'available', index: true },
 }, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
 
 grocerySchema.index({ name: 1, category: 1 });

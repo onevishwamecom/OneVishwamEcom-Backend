@@ -15,8 +15,9 @@ const userSchema = new mongoose.Schema(
     },
     email: {
       type: String,
-      required: [true, 'Email is required'],
+      required: false,
       unique: true,
+      sparse: true,
       lowercase: true,
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
@@ -27,6 +28,24 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       match: [/^\+?[\d\s-]{10,15}$/, 'Please provide a valid mobile number'],
+    },
+    phone: {
+      type: String,
+      trim: true,
+      unique: true,
+      sparse: true,
+    },
+    // Application-level Lister business ID. Derived from the VERIFIED phone
+    // number (normalized E.164 digits, e.g. "919876543210"). This is NOT the
+    // MongoDB _id — it is the stable business identifier for listings.
+    listerId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    phoneVerified: {
+      type: Boolean,
+      default: false,
     },
     password: {
       type: String,
@@ -77,14 +96,14 @@ userSchema.methods.comparePassword = async function (candidate) {
 };
 
 userSchema.methods.generateAccessToken = function () {
-  return jwt.sign({ id: this._id, role: this.role }, process.env.JWT_SECRET, {
+  return jwt.sign({ id: this._id, role: this.role, accountType: 'user' }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_ACCESS_EXPIRE || '15m',
   });
 };
 
 userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
-    { id: this._id, jti: crypto.randomBytes(16).toString('hex') },
+    { id: this._id, accountType: 'user', jti: crypto.randomBytes(16).toString('hex') },
     process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d' }
   );
@@ -93,14 +112,47 @@ userSchema.methods.generateRefreshToken = function () {
 userSchema.methods.toProfileJSON = function () {
   return {
     id: this._id,
+    accountType: 'user',
+    fullName: this.fullName,
+    name: this.fullName,
+    email: this.email,
+    mobile: this.mobile,
+    phone: this.phone || null,
+    listerId: this.listerId || null,
+    profileImage: this.profileImage,
+    role: this.role,
+    city: this.city,
+    area: this.area,
+    pincode: this.pincode,
+    isEmailVerified: this.isEmailVerified,
+    phoneVerified: this.phoneVerified,
+    accountStatus: this.accountStatus,
+    status: this.accountStatus,
+    lastLogin: this.lastLogin,
+    createdAt: this.createdAt,
+    notifications: {
+      email: this.notifications?.email ?? false,
+      whatsapp: this.notifications?.whatsapp ?? false,
+    },
+  };
+};
+
+userSchema.methods.toListerJSON = function () {
+  return {
+    id: this._id,
+    accountType: 'lister',
+    listerId: this.listerId || null,
+    name: this.fullName,
     fullName: this.fullName,
     email: this.email,
+    phone: this.phone || this.mobile || null,
     mobile: this.mobile,
     profileImage: this.profileImage,
     role: this.role,
     city: this.city,
     area: this.area,
     pincode: this.pincode,
+    phoneVerified: this.phoneVerified,
     isEmailVerified: this.isEmailVerified,
     accountStatus: this.accountStatus,
     lastLogin: this.lastLogin,

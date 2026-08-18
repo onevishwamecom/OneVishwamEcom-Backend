@@ -42,7 +42,6 @@ const propertySchema = new mongoose.Schema({
   images: { type: [String], default: [] },
   brochure: { type: String, default: '' },
   contact: { type: String, trim: true },
-  contactPhone: { type: String, trim: true },
   contactEmail: { type: String, trim: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   agent: {
@@ -50,7 +49,7 @@ const propertySchema = new mongoose.Schema({
     type: { type: String, default: 'Agent' },
     avatar: { type: String, default: '' },
   },
-  status: { type: String, enum: ['available', 'active', 'sold', 'rented', 'inactive', 'deleted'], default: 'active', index: true },
+  status: { type: String, enum: ['available', 'active', 'sold', 'rented', 'inactive', 'deleted', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'active', index: true },
   featured: { type: Boolean, default: false, index: true },
   verified: { type: Boolean, default: false },
   viewsCount: { type: Number, default: 0, index: true },

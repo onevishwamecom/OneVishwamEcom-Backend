@@ -1,10 +1,25 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Lister = require('../models/Lister');
 const ApiError = require('../utils/ApiError');
 const otpService = require('./otpService');
 const emailService = require('./emailService');
+const { resolveModel } = require('../middleware/auth');
 const { RESET_TOKEN_EXPIRY_MINUTES } = require('../config/authConfig');
+
+/**
+ * Fetch the authenticated account's normalized JSON from the collection
+ * implied by `accountType` ('user' -> users, 'lister' -> listers).
+ */
+const getAuthenticatedAccount = async ({ id, accountType }) => {
+  const Model = resolveModel(accountType);
+  const doc = await Model.findById(id);
+  if (!doc) {
+    throw new ApiError(404, accountType === 'lister' ? 'Lister not found' : 'User not found');
+  }
+  return accountType === 'lister' ? doc.toListerJSON() : doc.toProfileJSON();
+};
 
 const register = async ({ fullName, email, mobile, password }) => {
   const existingEmail = await User.findOne({ email: email.toLowerCase() });
@@ -114,10 +129,9 @@ const resetPassword = async ({ email, verifyToken, password }) => {
   await otpService.invalidateOtps(email);
 };
 
-const getMe = async (userId) => {
-  const user = await User.findById(userId);
-  if (!user) throw new ApiError(404, 'User not found');
-  return user.toProfileJSON();
+const getMe = async (auth) => {
+  if (!auth || !auth.id) throw new ApiError(401, 'Not authorized');
+  return getAuthenticatedAccount(auth);
 };
 
 const logout = async ({ refreshToken }) => {
@@ -126,10 +140,11 @@ const logout = async ({ refreshToken }) => {
   }
   try {
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
-    const user = await User.findById(payload.id).select('+refreshToken');
-    if (user && user.refreshToken === refreshToken) {
-      user.refreshToken = undefined;
-      await user.save({ validateBeforeSave: false });
+    const Model = resolveModel(payload.accountType || 'user');
+    const account = await Model.findById(payload.id).select('+refreshToken');
+    if (account && account.refreshToken === refreshToken) {
+      account.refreshToken = undefined;
+      await account.save({ validateBeforeSave: false });
     }
   } catch {
     // Token already invalid/reused; nothing to revoke
@@ -191,25 +206,46 @@ const refresh = async ({ refreshToken }) => {
     throw new ApiError(401, 'Invalid or expired refresh token');
   }
 
-  const user = await User.findById(payload.id).select('+refreshToken');
-  if (!user) throw new ApiError(401, 'User not found');
+  // New tokens carry accountType; legacy tokens fall back to User, then Lister.
+  let accountType = payload.accountType;
+  let account;
+  if (accountType === 'user' || accountType === 'lister') {
+    const Model = resolveModel(accountType);
+    account = await Model.findById(payload.id).select('+refreshToken');
+  } else {
+    account = await User.findById(payload.id).select('+refreshToken');
+    if (account) {
+      accountType = 'user';
+    } else {
+      account = await Lister.findById(payload.id).select('+refreshToken');
+      accountType = 'lister';
+    }
+  }
 
-  if (user.refreshToken !== refreshToken) {
-    user.refreshToken = undefined;
-    await user.save({ validateBeforeSave: false });
+  if (!account) throw new ApiError(401, 'Authenticated account not found');
+
+  if (account.refreshToken !== refreshToken) {
+    account.refreshToken = undefined;
+    await account.save({ validateBeforeSave: false });
     throw new ApiError(401, 'Refresh token reuse detected. All sessions have been revoked. Please log in again.');
   }
 
-  if (user.accountStatus !== 'active') {
+  if (accountType === 'user' && account.accountStatus !== 'active') {
+    throw new ApiError(403, 'Account is suspended. Please contact support.');
+  }
+  if (accountType === 'lister' && account.status !== 'ACTIVE') {
     throw new ApiError(403, 'Account is suspended. Please contact support.');
   }
 
-  const accessToken = user.generateAccessToken();
-  const newRefreshToken = user.generateRefreshToken();
-  user.refreshToken = newRefreshToken;
-  await user.save({ validateBeforeSave: false });
+  const accessToken = account.generateAccessToken();
+  const newRefreshToken = account.generateRefreshToken();
+  account.refreshToken = newRefreshToken;
+  await account.save({ validateBeforeSave: false });
 
-  return { accessToken, refreshToken: newRefreshToken, user: user.toProfileJSON() };
+  const json = accountType === 'lister' ? account.toListerJSON() : account.toProfileJSON();
+  return accountType === 'lister'
+    ? { accessToken, refreshToken: newRefreshToken, lister: json }
+    : { accessToken, refreshToken: newRefreshToken, user: json };
 };
 
-module.exports = { register, login, logout, forgotPassword, verifyOtp, resendOtp, resetPassword, getMe, refresh, updateProfile, changePassword, deleteAccount };
+module.exports = { register, login, logout, forgotPassword, verifyOtp, resendOtp, resetPassword, getMe, getAuthenticatedAccount, refresh, updateProfile, changePassword, deleteAccount };
