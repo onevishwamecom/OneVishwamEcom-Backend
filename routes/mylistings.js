@@ -8,19 +8,27 @@ const asyncHandler = require('../utils/asyncHandler');
 const router = express.Router();
 
 router.get('/', protect, asyncHandler(async (req, res) => {
-  const { serviceType } = req.query;
+  const { serviceType, status } = req.query;
+
+  // Support both user and lister accounts for backward compatibility
+  // Listers use 'lister' field, users use 'user' field
+  const filter = req.auth.accountType === 'lister' 
+    ? { lister: req.auth.id } 
+    : { user: req.auth.id };
+  
+  if (status) filter.status = status;
 
   if (serviceType) {
     const mod = modules.find(m => m.id === serviceType);
     if (!mod) throw new ApiError(400, 'Invalid serviceType');
-    const items = await mod.model.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const items = await mod.model.find(filter).sort({ createdAt: -1 });
     return new ApiResponse(200, { [serviceType]: items }, 'My listings fetched').send(res);
   }
 
   const all = {};
   await Promise.all(modules.map(async (mod) => {
     try {
-      const items = await mod.model.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(20);
+      const items = await mod.model.find(filter).sort({ createdAt: -1 }).limit(100);
       if (items.length > 0) all[mod.id] = items;
     } catch { }
   }));

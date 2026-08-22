@@ -40,6 +40,7 @@ const vehicleSchema = new mongoose.Schema({
   listedDate: { type: Date, default: Date.now },
   views: { type: Number, default: 0, index: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
+  lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
 }, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
 
 vehicleSchema.index({ brand: 1, model: 1 });

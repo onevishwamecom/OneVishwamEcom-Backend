@@ -8,6 +8,7 @@ const requirementSchema = new mongoose.Schema({
   email: { type: String, trim: true, lowercase: true },
   message: { type: String, trim: true, maxlength: 2000 },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
 }, { timestamps: true });
 
 requirementSchema.index({ serviceType: 1, createdAt: -1 });

@@ -65,6 +65,7 @@ const propertySchema = new mongoose.Schema({
   totalUnits: { type: Number, default: 0 },
   availableUnits: { type: Number, default: 0 },
   availability: { type: String, default: '', trim: true },
+  lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

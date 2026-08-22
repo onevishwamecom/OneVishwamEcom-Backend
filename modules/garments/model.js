@@ -15,6 +15,7 @@ const garmentSchema = new mongoose.Schema({
   gender: { type: String, enum: ['male', 'female', 'unisex'], default: 'unisex' },
   quantity: { type: Number, default: 1, min: 0 },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
   status: { type: String, enum: ['available', 'sold', 'out-of-stock', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'available', index: true },
 }, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
 
