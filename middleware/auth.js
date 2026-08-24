@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Lister = require('../models/Lister');
+const Admin = require('../models/Admin');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -10,14 +11,18 @@ const asyncHandler = require('../utils/asyncHandler');
  * claim for backward compatibility. Never guesses from fields like email.
  */
 function resolveAccountType(decoded) {
-  if (decoded.accountType === 'user' || decoded.accountType === 'lister') {
+  if (decoded.accountType === 'user' || decoded.accountType === 'lister' || decoded.accountType === 'admin') {
     return decoded.accountType;
   }
-  return decoded.role === 'lister' ? 'lister' : 'user';
+  if (decoded.role === 'lister') return 'lister';
+  if (decoded.role === 'admin' || decoded.role === 'super-admin') return 'admin';
+  return 'user';
 }
 
 function resolveModel(accountType) {
-  return accountType === 'lister' ? Lister : User;
+  if (accountType === 'lister') return Lister;
+  if (accountType === 'admin') return Admin;
+  return User;
 }
 
 function extractBearerToken(req) {
@@ -41,7 +46,7 @@ async function attachAuthenticatedAccount(req, token) {
   req.auth = {
     id: doc._id,
     accountType,
-    role: decoded.role || (accountType === 'lister' ? 'lister' : doc.role),
+    role: decoded.role || (accountType === 'lister' ? 'lister' : accountType === 'admin' ? 'admin' : doc.role),
     listerId: doc.listerId || null,
   };
   // req.user is kept for existing controllers that already use it.
@@ -80,7 +85,7 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
 });
 
 const adminOnly = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'super-admin')) {
     return next();
   }
   next(new ApiError(403, 'Not authorized as admin'));
