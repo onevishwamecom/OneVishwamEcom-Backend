@@ -201,9 +201,57 @@ const getListingDetail = asyncHandler(async (req, res) => {
   new ApiResponse(200, { item }, 'Listing fetched').send(res);
 });
 
+const overrideListing = asyncHandler(async (req, res) => {
+  const { type, id } = req.params;
+  const mod = findModule(type);
+  const item = await mod.model.findById(id);
+  if (!item) throw new ApiError(404, 'Listing not found');
+
+  const updates = { ...req.body };
+  delete updates._id;
+  delete updates.__v;
+  delete updates.createdAt;
+  delete updates.user;
+  delete updates.lister;
+
+  if (updates.price !== undefined && updates.price !== null && updates.price !== '') {
+    const numPrice = Number(String(updates.price).replace(/[₹,\s]/g, ''));
+    if (!isNaN(numPrice)) {
+      updates.numericPrice = numPrice;
+      updates.priceValue = numPrice;
+    }
+  }
+
+  if (updates.area_sqft !== undefined && updates.area_sqft !== null && updates.area_sqft !== '') {
+    const numArea = Number(String(updates.area_sqft).replace(/[^\d.]/g, ''));
+    if (!isNaN(numArea)) {
+      updates.numericArea = numArea;
+    }
+  }
+
+  if (updates.weight !== undefined && updates.weight !== null && updates.weight !== '') {
+    const numWeight = Number(updates.weight);
+    if (!isNaN(numWeight)) {
+      updates.weightGrams = numWeight;
+    }
+  }
+
+  Object.assign(item, updates);
+  item.updatedAt = new Date();
+  await item.save();
+
+  new ApiResponse(200, { item }, 'Listing overridden successfully').send(res);
+});
+
 const updateListingStatus = asyncHandler(async (req, res) => {
   const { type, id } = req.params;
   const { status, reason } = req.body;
+
+  // If payload contains more than status/reason, route to full override
+  const keys = Object.keys(req.body);
+  if (keys.some((k) => k !== 'status' && k !== 'reason' && k !== 'adminComment')) {
+    return overrideListing(req, res);
+  }
 
   const validStatuses = ['approved', 'rejected', 'changes-required', 'cancelled'];
   if (!validStatuses.includes(status)) {
@@ -351,6 +399,7 @@ module.exports = {
   getListingStats,
   getListingDetail,
   updateListingStatus,
+  overrideListing,
   approveListing,
   requestChanges,
   cancelListing,
