@@ -119,7 +119,8 @@ const getById = async (id) => {
 const getFeatured = async () => {
   const items = await Property.find({ featured: true, status: { $ne: 'deleted' } })
     .sort({ createdAt: -1 })
-    .limit(6);
+    .limit(6)
+    .lean();
   return { items };
 };
 
@@ -127,12 +128,13 @@ const getLatest = async (limit = 6) => {
   const l = Math.min(20, Number(limit));
   const items = await Property.find({ status: { $ne: 'deleted' } })
     .sort({ createdAt: -1 })
-    .limit(l);
+    .limit(l)
+    .lean();
   return { items };
 };
 
 const getSimilar = async (id) => {
-  const property = await Property.findById(id);
+  const property = await Property.findById(id).lean();
   if (!property) throw new ApiError(404, 'Property not found');
 
   const similar = await Property.find({
@@ -145,7 +147,8 @@ const getSimilar = async (id) => {
     ],
   })
     .sort({ createdAt: -1 })
-    .limit(4);
+    .limit(4)
+    .lean();
 
   return { items: similar };
 };
