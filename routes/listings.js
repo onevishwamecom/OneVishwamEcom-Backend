@@ -60,13 +60,8 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   new ApiResponse(200, grouped, 'Listings fetched').send(res);
 }));
 
-// POST /api/listings  — create a listing owned by the authenticated lister.
+// POST /api/listings  — create a listing owned by the authenticated account.
 router.post('/', protect, asyncHandler(async (req, res) => {
-  // Only listers can create listings
-  if (req.auth.accountType !== 'lister') {
-    throw new ApiError(403, 'Only listers can create listings');
-  }
-
   const type = req.body._type || CATEGORY_TO_MODULE[req.body.category] || null;
   const mod = findModule(type);
 
@@ -78,7 +73,14 @@ router.post('/', protect, asyncHandler(async (req, res) => {
   delete body._type;
   delete body.status; // Backend controls status - always PENDING on creation
 
-  const data = { ...body, lister: req.auth.id, status: 'pending' };
+  const data = { ...body, status: 'pending' };
+  if (req.auth.accountType === 'lister') {
+    data.lister = req.auth.id;
+  } else {
+    data.user = req.auth.id;
+    data.lister = req.auth.id;
+  }
+
   const item = await mod.model.create(data);
   new ApiResponse(201, { item }, 'Listing created successfully. It is pending admin approval.').send(res);
 }));
@@ -91,6 +93,7 @@ function isOwnerOrAdmin(item, req) {
   }
   // Fallback to user ownership for backward compatibility
   if (item && item.user && item.user.toString() === req.auth.id.toString()) return;
+  if (item && item.lister && item.lister.toString() === req.auth.id.toString()) return;
   throw new ApiError(403, 'Not authorized to access this listing');
 }
 
@@ -116,8 +119,8 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   if (!item) throw new ApiError(404, 'Listing not found');
   isOwnerOrAdmin(item, req);
 
-  // Listers cannot edit cancelled listings
-  if (req.auth.accountType === 'lister') {
+  // Non-admins cannot edit cancelled listings
+  if (req.auth.role !== 'admin') {
     canListerEdit(item, req);
   }
 
@@ -126,16 +129,16 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   delete body.user;
   delete body.lister;
   delete body._type;
-  // Listers cannot change status directly
-  if (req.auth.accountType === 'lister') {
+  // Non-admins cannot change status directly
+  if (req.auth.role !== 'admin') {
     delete body.status;
   }
 
   const wasApproved = item.status === 'approved';
   Object.assign(item, body);
 
-  // If lister edits a changes-required or approved listing, it goes back to pending
-  if (req.auth.accountType === 'lister' && (item.status === 'changes-required' || wasApproved)) {
+  // If user/lister edits a changes-required or approved listing, it goes back to pending
+  if (req.auth.role !== 'admin' && (item.status === 'changes-required' || wasApproved)) {
     item.status = 'pending';
     // Clear any previous admin comment when resubmitting
     item.adminComment = undefined;
