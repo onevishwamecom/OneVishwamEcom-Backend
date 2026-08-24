@@ -19,6 +19,7 @@ router.get('/', asyncHandler(async (req, res) => {
   await Promise.all(modules.map(async (mod) => {
     try {
       const items = await mod.model.find({
+        status: 'approved',
         $or: [{ title: { $regex: query, $options: 'i' } }, { description: { $regex: query, $options: 'i' } }],
       }).limit(l);
       if (items.length > 0) results[mod.id] = items;

@@ -31,6 +31,14 @@ router.post(
 
 router.use(protect, adminOnly);
 
+// Prevent any browser/proxy caching of admin API responses
+router.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 router.get('/auth/me', adminController.getMe);
 
 // Listings

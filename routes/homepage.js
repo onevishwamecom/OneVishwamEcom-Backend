@@ -81,49 +81,49 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     financeOfferings,
   ] = await Promise.all([
     // Featured properties (top 6)
-    Property.find({ featured: true, status: { $ne: 'deleted' } })
+    Property.find({ featured: true, status: { $in: ['approved', 'active'] } })
       .sort({ createdAt: -1 })
       .limit(6)
       .select(CARD_PROJECTION)
       .lean(),
 
     // Latest properties (top 8)
-    Property.find({ status: { $ne: 'deleted' } })
+    Property.find({ status: { $in: ['approved', 'active'] } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean(),
 
     // Latest vehicles (top 8)
-    Vehicle.find({ status: { $ne: 'deleted' } })
+    Vehicle.find({ status: { $in: ['approved', 'active'] } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
 
     // Latest groceries (top 8)
-    Grocery.find({ status: { $ne: 'deleted' } })
+    Grocery.find({ status: { $in: ['approved', 'active'] } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
 
     // Latest garments (top 8)
-    Garment.find({ status: { $ne: 'deleted' } })
+    Garment.find({ status: { $in: ['approved', 'active'] } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
 
     // Latest jewellery (top 8)
-    Jewellery.find({ status: { $ne: 'deleted' } })
+    Jewellery.find({ status: { $in: ['approved', 'active'] } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
 
     // Latest finance services (top 6)
-    Finance.find({ status: { $ne: 'deleted' } })
+    Finance.find({ status: { $in: ['approved', 'active'] } })
       .sort({ createdAt: -1 })
       .limit(6)
       .select(CARD_PROJECTION)
@@ -146,12 +146,12 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     totalJewellery,
     totalFinance,
   ] = await Promise.all([
-    Property.countDocuments({ status: { $ne: 'deleted' } }),
-    Vehicle.countDocuments({ status: { $ne: 'deleted' } }).catch(() => 0),
-    Grocery.countDocuments({ status: { $ne: 'deleted' } }).catch(() => 0),
-    Garment.countDocuments({ status: { $ne: 'deleted' } }).catch(() => 0),
-    Jewellery.countDocuments({ status: { $ne: 'deleted' } }).catch(() => 0),
-    Finance.countDocuments({ status: { $ne: 'deleted' } }).catch(() => 0),
+    Property.countDocuments({ status: { $in: ['approved', 'active'] } }),
+    Vehicle.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
+    Grocery.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
+    Garment.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
+    Jewellery.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
+    Finance.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
   ]);
 
   const data = {

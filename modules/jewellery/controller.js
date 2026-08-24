@@ -43,7 +43,7 @@ function transformCreateData(req, data) {
     },
     numericPrice: parsePrice(data.price),
     images: data.images || [],
-    status: 'active',
+    status: 'pending',
     featured: false,
   };
 }
@@ -73,7 +73,7 @@ function transformUpdateData(req, item) {
 }
 
 function buildJewelleryFilter(query) {
-  const filter = { status: 'active' };
+  const filter = { status: { $in: ['approved', 'active'] } };
   
   // Category exact match
   if (query.category) {
@@ -177,7 +177,7 @@ const base = createCRUDController({
     weightGrams: { min: 'weightMin', max: 'weightMax' },
   },
   defaultSort: { createdAt: -1 },
-  defaultFilter: { status: 'active' },
+  defaultFilter: { status: { $in: ['approved', 'active'] } },
   transformCreateData,
   transformUpdateData,
 });
@@ -197,7 +197,7 @@ const getAll = async (req, res) => {
 };
 
 const getById = async (req, res) => {
-  const item = await Jewellery.findById(req.params.id);
+  const item = await Jewellery.findOne({ _id: req.params.id, status: { $in: ['approved', 'active'] } });
   if (!item) {
     throw new ApiError(404, 'Item not found');
   }
@@ -220,7 +220,7 @@ const getSimilar = async (req, res) => {
     const similar = await Jewellery.find({
       _id: { $ne: id },
       category: item.category,
-      status: 'active',
+      status: { $in: ['approved', 'active'] },
     })
       .limit(4)
       .sort({ featured: -1, createdAt: -1 });

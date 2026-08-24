@@ -16,7 +16,7 @@ const SORT_OPTIONS = {
 };
 
 function buildFilter(query) {
-  const filter = { status: { $ne: 'deleted' } };
+  const filter = { status: { $in: ['approved', 'active'] } };
   const reserved = ['q', 'page', 'limit', 'sort', 'sortBy'];
 
   for (const [key, value] of Object.entries(query)) {
@@ -51,7 +51,7 @@ function buildFilter(query) {
 
 function buildSearchQuery(q) {
   return {
-    status: { $ne: 'deleted' },
+    status: { $in: ['approved', 'active'] },
     $or: [
       { title: { $regex: q, $options: 'i' } },
       { description: { $regex: q, $options: 'i' } },
@@ -108,7 +108,7 @@ const getAll = async (query) => {
 
 const getById = async (id) => {
   const property = await Property.findOneAndUpdate(
-    { _id: id, status: { $ne: 'deleted' } },
+    { _id: id, status: { $in: ['approved', 'active'] } },
     { $inc: { viewsCount: 1 } },
     { new: true }
   );
@@ -117,7 +117,7 @@ const getById = async (id) => {
 };
 
 const getFeatured = async () => {
-  const items = await Property.find({ featured: true, status: { $ne: 'deleted' } })
+  const items = await Property.find({ featured: true, status: { $in: ['approved', 'active'] } })
     .sort({ createdAt: -1 })
     .limit(6)
     .lean();
@@ -126,7 +126,7 @@ const getFeatured = async () => {
 
 const getLatest = async (limit = 6) => {
   const l = Math.min(20, Number(limit));
-  const items = await Property.find({ status: { $ne: 'deleted' } })
+  const items = await Property.find({ status: { $in: ['approved', 'active'] } })
     .sort({ createdAt: -1 })
     .limit(l)
     .lean();
@@ -139,7 +139,7 @@ const getSimilar = async (id) => {
 
   const similar = await Property.find({
     _id: { $ne: property._id },
-    status: { $ne: 'deleted' },
+    status: { $in: ['approved', 'active'] },
     $or: [
       { city: property.city },
       { area: property.area },

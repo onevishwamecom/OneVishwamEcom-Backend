@@ -7,7 +7,7 @@ function createCRUDController({
   searchFields = [],
   rangeFilters = {},
   defaultSort = { createdAt: -1 },
-  defaultFilter = { status: 'available' },
+  defaultFilter = { status: { $in: ['approved', 'active'] } },
   ownerField = 'user',
   transformCreateData,
   transformUpdateData,
@@ -89,7 +89,7 @@ function createCRUDController({
   });
 
   const getById = asyncHandler(async (req, res) => {
-    const item = await model.findById(req.params.id);
+    const item = await model.findOne({ _id: req.params.id, status: { $in: ['approved', 'active'] } });
     if (!item) throw new ApiError(404, 'Not found');
     new ApiResponse(200, { item }, 'Fetched successfully').send(res);
   });

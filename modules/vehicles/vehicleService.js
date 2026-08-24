@@ -8,7 +8,7 @@ const SORT_OPTIONS = {
 };
 
 function buildFilter(query) {
-  const filter = { status: 'active' };
+  const filter = { status: { $in: ['approved', 'active'] } };
   const reserved = ['q', 'page', 'limit', 'sort', 'sortBy', 'search', 'minPrice', 'maxPrice', 'minKm', 'maxKm'];
 
   for (const [key, value] of Object.entries(query)) {
@@ -41,6 +41,7 @@ function buildFilter(query) {
 
 function buildSearchQuery(q) {
   return {
+    status: { $in: ['approved', 'active'] },
     $or: [
       { brand: { $regex: q, $options: 'i' } },
       { model: { $regex: q, $options: 'i' } },
@@ -79,7 +80,11 @@ const getAll = async (query) => {
 };
 
 const getById = async (id) => {
-  const vehicle = await Vehicle.findByIdAndUpdate(id, { $inc: { views: 1 } }, { new: true });
+  const vehicle = await Vehicle.findOneAndUpdate(
+    { _id: id, status: { $in: ['approved', 'active'] } },
+    { $inc: { views: 1 } },
+    { new: true }
+  );
   if (!vehicle) throw new ApiError(404, 'Vehicle not found');
   return vehicle;
 };
@@ -90,7 +95,7 @@ const getSimilar = async (id) => {
 
   const similar = await Vehicle.find({
     _id: { $ne: vehicle._id },
-    status: 'active',
+    status: { $in: ['approved', 'active'] },
     category: vehicle.category,
   })
     .sort({ createdAt: -1 })
