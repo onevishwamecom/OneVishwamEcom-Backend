@@ -5,6 +5,7 @@ const propertySchema = new mongoose.Schema({
   subtitle: { type: String, trim: true, maxlength: 500 },
   description: { type: String, maxlength: 5000 },
   category: { type: String, trim: true, index: true },
+  subcategory: { type: String, trim: true, index: true },
   propertyType: { type: String, trim: true, index: true },
   purpose: { type: String, enum: ['Sell', 'Rent', 'Lease'], index: true },
   price: { type: String, trim: true },

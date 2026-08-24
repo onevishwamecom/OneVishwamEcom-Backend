@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const financeSchema = new mongoose.Schema({
   serviceName: { type: String, trim: true, index: true },
   category: { type: String, required: true, trim: true, index: true },
+  subcategory: { type: String, trim: true, index: true },
   companyName: { type: String, required: true, trim: true, index: true },
   providerType: { type: String, trim: true },
   logo: { type: String, default: '' },

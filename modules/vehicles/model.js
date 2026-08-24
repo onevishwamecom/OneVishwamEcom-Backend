@@ -15,6 +15,7 @@ const vehicleSchema = new mongoose.Schema({
   year: { type: Number, required: true, index: true },
   condition: { type: String, required: true, enum: ['new', 'old'], index: true },
   category: { type: String, required: true, enum: ['2-wheeler', '3-wheeler', '4-wheeler', 'commercial'], index: true },
+  subcategory: { type: String, trim: true, index: true },
   wheelerType: { type: String, enum: ['2-wheeler', '3-wheeler', '4-wheeler', 'commercial'], index: true },
   fuelType: { type: String, required: true, enum: ['Petrol', 'Diesel', 'Electric', 'CNG'], index: true },
   price: { type: String, required: true, trim: true },

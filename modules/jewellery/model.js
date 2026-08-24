@@ -18,6 +18,7 @@ const jewellerySchema = new mongoose.Schema({
   numericPrice: { type: Number, default: 0, index: true },
   makingCharges: { type: String, default: '₹ 0', trim: true },
   category: { type: String, required: true, trim: true, index: true },
+  subcategory: { type: String, trim: true, index: true },
   occasion: { type: [String], default: [] },
   certified: { type: Boolean, default: false, index: true },
   certificationBody: { type: String, trim: true },
