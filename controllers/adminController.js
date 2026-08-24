@@ -5,6 +5,7 @@ const Admin = require('../models/Admin');
 const jwt = require('jsonwebtoken');
 const modules = require('../modules');
 const Lister = require('../models/Lister');
+const { parsePrice } = require('../utils/priceUtils');
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
@@ -215,8 +216,8 @@ const overrideListing = asyncHandler(async (req, res) => {
   delete updates.lister;
 
   if (updates.price !== undefined && updates.price !== null && updates.price !== '') {
-    const numPrice = Number(String(updates.price).replace(/[₹,\s]/g, ''));
-    if (!isNaN(numPrice)) {
+    const numPrice = parsePrice(updates.price);
+    if (numPrice > 0) {
       updates.numericPrice = numPrice;
       updates.priceValue = numPrice;
     }

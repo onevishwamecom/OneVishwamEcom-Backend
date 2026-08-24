@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { parsePrice } = require('../../utils/priceUtils');
 
 const propertySchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 200 },
@@ -10,6 +11,7 @@ const propertySchema = new mongoose.Schema({
   purpose: { type: String, enum: ['Sell', 'Rent', 'Lease'], index: true },
   price: { type: String, trim: true },
   numericPrice: { type: Number, default: 0, index: true },
+  priceType: { type: String, default: 'fixed', trim: true },
   priceSuffix: { type: String, default: '', trim: true },
   negotiable: { type: Boolean, default: false },
   country: { type: String, default: 'India', trim: true },
@@ -93,17 +95,6 @@ propertySchema.pre('save', function (next) {
   }
   next();
 });
-
-function parsePrice(s) {
-  if (!s) return 0;
-  const c = s.replace(/[₹,]/g, '').trim();
-  const n = parseFloat(c);
-  if (isNaN(n)) return 0;
-  if (c.toLowerCase().includes('cr')) return n * 10000000;
-  if (c.toLowerCase().includes('l') && !c.toLowerCase().includes('la')) return n * 100000;
-  if (c.toLowerCase().includes('k')) return n * 1000;
-  return n;
-}
 
 function parseArea(s) {
   if (!s) return 0;

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { parsePrice } = require('../../utils/priceUtils');
 
 const storeSchema = new mongoose.Schema({
   name: { type: String, trim: true },
@@ -16,6 +17,8 @@ const jewellerySchema = new mongoose.Schema({
   weightGrams: { type: Number, default: 0, min: 0, index: true },
   price: { type: String, required: true, trim: true },
   numericPrice: { type: Number, default: 0, index: true },
+  priceType: { type: String, default: 'fixed', trim: true },
+  priceSuffix: { type: String, default: '', trim: true },
   makingCharges: { type: String, default: '₹ 0', trim: true },
   category: { type: String, required: true, trim: true, index: true },
   subcategory: { type: String, trim: true, index: true },
@@ -50,9 +53,7 @@ jewellerySchema.pre('save', function (next) {
   if (this.isNew && !this.name && this.title) this.name = this.title;
   if (this.isNew && !this.title && this.name) this.title = this.name;
   if (this.isModified('price') || this.isNew) {
-    const cleaned = (this.price || '').replace(/[₹,]/g, '').trim();
-    const num = parseFloat(cleaned);
-    this.numericPrice = isNaN(num) ? 0 : num;
+    this.numericPrice = parsePrice(this.price);
   }
   next();
 });

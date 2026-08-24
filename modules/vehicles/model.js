@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { parsePrice } = require('../../utils/priceUtils');
 
 const showroomSchema = new mongoose.Schema({
   name: { type: String, trim: true },
@@ -20,6 +21,8 @@ const vehicleSchema = new mongoose.Schema({
   fuelType: { type: String, required: true, enum: ['Petrol', 'Diesel', 'Electric', 'CNG'], index: true },
   price: { type: String, required: true, trim: true },
   priceValue: { type: Number, required: true },
+  priceType: { type: String, default: 'fixed', trim: true },
+  priceSuffix: { type: String, default: '', trim: true },
   kmDriven: { type: Number, required: true, default: 0, index: true },
   location: { type: String, required: true, trim: true },
   city: { type: String, required: true, lowercase: true, trim: true, index: true },
@@ -61,6 +64,10 @@ vehicleSchema.pre('save', function (next) {
   if (!this.wheelerType) this.wheelerType = this.category;
   if (!this.title) {
     this.title = `${this.brand} ${this.model} ${this.year || ''}`.trim();
+  }
+  if (this.isModified('price') || this.isNew) {
+    const parsed = parsePrice(this.price);
+    if (parsed > 0) this.priceValue = parsed;
   }
   next();
 });

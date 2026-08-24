@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { parsePrice } = require('../../utils/priceUtils');
 
 const financeSchema = new mongoose.Schema({
   serviceName: { type: String, trim: true, index: true },
@@ -11,6 +12,10 @@ const financeSchema = new mongoose.Schema({
   interestRate: { type: String, trim: true },
   interestMin: { type: Number, default: 0 },
   interestMax: { type: Number, default: 0 },
+  price: { type: String, trim: true },
+  numericPrice: { type: Number, default: 0, index: true },
+  priceType: { type: String, default: 'fixed', trim: true },
+  priceSuffix: { type: String, default: '', trim: true },
   minAmount: { type: String, trim: true },
   maxAmount: { type: String, trim: true },
   minAmountNumeric: { type: Number, default: 0 },
@@ -45,5 +50,18 @@ financeSchema.index({ createdAt: -1 });
 financeSchema.index({
   serviceName: 'text', companyName: 'text', category: 'text', description: 'text', location: 'text',
 }, { name: 'finance_search' });
+
+financeSchema.pre('save', function (next) {
+  if (this.isModified('price') || this.isNew) {
+    if (this.price) this.numericPrice = parsePrice(this.price);
+  }
+  if (this.isModified('minAmount') || this.isNew) {
+    if (this.minAmount) this.minAmountNumeric = parsePrice(this.minAmount);
+  }
+  if (this.isModified('maxAmount') || this.isNew) {
+    if (this.maxAmount) this.maxAmountNumeric = parsePrice(this.maxAmount);
+  }
+  next();
+});
 
 module.exports = mongoose.model('Finance', financeSchema);
