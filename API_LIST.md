@@ -166,7 +166,7 @@ All services share the **same API shape**. Only the `:service` segment changes:
 | `limit` | Number | `20` | Items per page (max 100) |
 | `city` | String | `bengaluru` | Filter by city |
 | `area` | String | `whitefield` | Filter by area |
-| `propertyType` | String | `Flats` | Filter by property type |
+| `propertyType` | String | `Flat` | Filter by property type |
 | `purpose` | String | `Rent` | Filter by purpose (`Sell`, `Rent`, `Lease`) |
 | `category` | String | `apartment` | Filter by category |
 | `priceMin` | Number | `500000` | Minimum price |

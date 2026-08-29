@@ -326,6 +326,28 @@ const cancelListing = asyncHandler(async (req, res) => {
   new ApiResponse(200, { item }, 'Listing cancelled successfully').send(res);
 });
 
+const updateAvailabilityStatus = asyncHandler(async (req, res) => {
+  const { type, id } = req.params;
+  const { availabilityStatus } = req.body;
+
+  const validStatuses = ['available', 'sold_out', 'inactive'];
+  if (!validStatuses.includes(availabilityStatus)) {
+    throw new ApiError(400, `Invalid availabilityStatus "${availabilityStatus}". Must be one of: ${validStatuses.join(', ')}`);
+  }
+
+  const mod = findModule(type);
+  const item = await mod.model.findById(id);
+  if (!item) throw new ApiError(404, 'Listing not found');
+
+  item.availabilityStatus = availabilityStatus;
+  item.availabilityUpdatedAt = new Date();
+  item.availabilityUpdatedBy = req.auth.id;
+  item.updatedAt = new Date();
+  await item.save();
+
+  new ApiResponse(200, { item }, `Listing availability updated to ${availabilityStatus}`).send(res);
+});
+
 const deleteListing = asyncHandler(async (req, res) => {
   const { type, id } = req.params;
   const mod = findModule(type);
@@ -405,6 +427,7 @@ module.exports = {
   requestChanges,
   cancelListing,
   deleteListing,
+  updateAvailabilityStatus,
   getContributors,
   getContributorById,
 };

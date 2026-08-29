@@ -7,7 +7,6 @@ const propertySchema = new mongoose.Schema({
   description: { type: String, maxlength: 5000 },
   category: { type: String, trim: true, index: true },
   subcategory: { type: String, trim: true, index: true },
-  propertyType: { type: String, trim: true, index: true },
   purpose: { type: String, enum: ['Sell', 'Rent', 'Lease'], index: true },
   price: { type: String, trim: true },
   numericPrice: { type: Number, default: 0, index: true },
@@ -68,15 +67,30 @@ const propertySchema = new mongoose.Schema({
   totalUnits: { type: Number, default: 0 },
   availableUnits: { type: Number, default: 0 },
   availability: { type: String, default: '', trim: true },
+  availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
   lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
+  toJSON: {
+    virtuals: true,
+    transform: (doc, ret) => {
+      delete ret.__v;
+      // Preserve original subcategory value; add normalized version for UI if needed
+      const rawSub = String(ret.subcategory || ret.subCategory || ret.category || '').toLowerCase();
+      let normalizedSubcategory = 'Flat';
+      if (rawSub.includes('plot') || rawSub.includes('site') || rawSub.includes('land')) {
+        normalizedSubcategory = 'Plot';
+      } else if (rawSub.includes('villa')) {
+        normalizedSubcategory = 'Villa';
+      }
+      return ret;
+    },
+  },
   toObject: { virtuals: true },
 });
 
 propertySchema.index({ city: 1, area: 1 });
-propertySchema.index({ propertyType: 1, status: 1 });
+propertySchema.index({ subcategory: 1, status: 1 });
 propertySchema.index({ category: 1, status: 1 });
 propertySchema.index({ purpose: 1, status: 1 });
 propertySchema.index({ createdAt: -1 });
@@ -87,12 +101,22 @@ propertySchema.index({
 }, { weights: { title: 10, subtitle: 5, description: 1, location: 3, area: 3, city: 5 }, name: 'property_search' });
 
 propertySchema.pre('save', function (next) {
-  if (this.isNew && !this.numericPrice && this.price) {
+  if (!this.numericPrice && this.price) {
     this.numericPrice = parsePrice(this.price);
   }
-  if (this.isNew && !this.numericArea && this.area) {
+  if (!this.numericArea && this.area) {
     this.numericArea = parseArea(this.area);
   }
+
+  // Store normalized subcategory for UI filtering; keep original subcategory intact
+  const rawSub = String(this.subcategory || this.subCategory || this.category || '').toLowerCase();
+  let normalizedSubcategory = 'Flat';
+  if (rawSub.includes('plot') || rawSub.includes('site') || rawSub.includes('land')) {
+    normalizedSubcategory = 'Plot';
+  } else if (rawSub.includes('villa')) {
+    normalizedSubcategory = 'Villa';
+  }
+
   next();
 });
 

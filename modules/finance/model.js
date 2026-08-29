@@ -38,6 +38,7 @@ const financeSchema = new mongoose.Schema({
   featured: { type: Boolean, default: false, index: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
+  availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

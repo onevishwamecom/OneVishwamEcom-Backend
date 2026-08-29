@@ -45,6 +45,7 @@ const vehicleSchema = new mongoose.Schema({
   views: { type: Number, default: 0, index: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
+  availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
 }, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
 
 vehicleSchema.index({ brand: 1, model: 1 });

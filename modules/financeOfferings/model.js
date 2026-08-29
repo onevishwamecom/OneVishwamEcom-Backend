@@ -16,6 +16,7 @@ const financeOfferingSchema = new mongoose.Schema({
   badgeColor: { type: String, default: '' },
   order: { type: Number, default: 0, index: true },
   status: { type: String, enum: ['active', 'inactive'], default: 'active', index: true },
+  availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
 }, {
   timestamps: true,
 });

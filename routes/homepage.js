@@ -14,6 +14,7 @@ const FinanceOffering = require('../modules/financeOfferings/model');
 const router = express.Router();
 
 // Card-level projection — only fields needed by homepage cards
+// Card-level projection — only fields needed by homepage cards
 const CARD_PROJECTION = {
   title: 1,
   name: 1,
@@ -27,8 +28,8 @@ const CARD_PROJECTION = {
   images: 1,
   image: 1,
   category: 1,
-  propertyType: 1,
   status: 1,
+  availabilityStatus: 1,
   featured: 1,
   createdAt: 1,
   // Vehicle-specific
@@ -66,6 +67,7 @@ const FINANCE_OFFERING_PROJECTION = {
   badgeColor: 1,
   order: 1,
   status: 1,
+  availabilityStatus: 1,
 };
 
 // GET /api/homepage — single endpoint returning all homepage sections
@@ -81,56 +83,56 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     financeOfferings,
   ] = await Promise.all([
     // Featured properties (top 6)
-    Property.find({ featured: true, status: { $in: ['approved', 'active'] } })
+    Property.find({ featured: true, status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
       .sort({ createdAt: -1 })
       .limit(6)
       .select(CARD_PROJECTION)
       .lean(),
 
     // Latest properties (top 8)
-    Property.find({ status: { $in: ['approved', 'active'] } })
+    Property.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean(),
 
     // Latest vehicles (top 8)
-    Vehicle.find({ status: { $in: ['approved', 'active'] } })
+    Vehicle.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
 
     // Latest groceries (top 8)
-    Grocery.find({ status: { $in: ['approved', 'active'] } })
+    Grocery.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
 
     // Latest garments (top 8)
-    Garment.find({ status: { $in: ['approved', 'active'] } })
+    Garment.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
 
     // Latest jewellery (top 8)
-    Jewellery.find({ status: { $in: ['approved', 'active'] } })
+    Jewellery.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
 
     // Latest finance services (top 6)
-    Finance.find({ status: { $in: ['approved', 'active'] } })
+    Finance.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
       .sort({ createdAt: -1 })
       .limit(6)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
 
     // Finance offerings / loan cards (top 6)
-    FinanceOffering.find({ status: 'active' })
+    FinanceOffering.find({ status: 'active', availabilityStatus: { $ne: 'sold_out' } })
       .sort({ order: 1, createdAt: -1 })
       .limit(6)
       .select(FINANCE_OFFERING_PROJECTION)

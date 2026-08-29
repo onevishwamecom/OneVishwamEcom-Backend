@@ -14,11 +14,12 @@ function createCRUDController({
 }) {
 
   function buildFilter(query) {
-    const filter = { ...defaultFilter };
-    const reserved = ['q', 'page', 'limit', 'sort'];
+    const filter = { ...defaultFilter, availabilityStatus: { $in: ['available', 'sold_out'] } };
+    const reserved = ['q', 'page', 'limit', 'sort', 'sortBy', 'search'];
 
     for (const [key, value] of Object.entries(query)) {
       if (reserved.includes(key)) continue;
+      if (value === '' || value === undefined || value === null || value === 'all') continue;
       if (key.endsWith('Min') || key.endsWith('Max')) continue;
       filter[key] = value;
     }
@@ -37,6 +38,7 @@ function createCRUDController({
 
   function buildSearchQuery(q) {
     return {
+      availabilityStatus: { $in: ['available', 'sold_out'] },
       $or: searchFields.map(field => ({
         [field]: { $regex: q, $options: 'i' },
       })),
@@ -89,7 +91,7 @@ function createCRUDController({
   });
 
   const getById = asyncHandler(async (req, res) => {
-    const item = await model.findOne({ _id: req.params.id, status: { $in: ['approved', 'active'] } });
+    const item = await model.findOne({ _id: req.params.id, status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out'] } });
     if (!item) throw new ApiError(404, 'Not found');
     new ApiResponse(200, { item }, 'Fetched successfully').send(res);
   });

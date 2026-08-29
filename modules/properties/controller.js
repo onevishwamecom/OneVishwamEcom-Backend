@@ -26,7 +26,7 @@ const base = createCRUDController({
   model: Property,
   ownerField: 'user',
   defaultFilter: { status: { $ne: 'deleted' } },
-  searchFields: ['title', 'description', 'city', 'area', 'location', 'propertyType', 'subtitle'],
+  searchFields: ['title', 'description', 'city', 'area', 'location', 'subtitle'],
   rangeFilters: {
     numericPrice: { min: 'priceMin', max: 'priceMax' },
     numericArea: { min: 'areaMin', max: 'areaMax' },
