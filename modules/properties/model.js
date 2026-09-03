@@ -42,6 +42,8 @@ const propertySchema = new mongoose.Schema({
   powerBackup: { type: Boolean, default: false },
   amenities: { type: [String], default: [] },
   images: { type: [String], default: [] },
+  floorPlanImages: { type: [String], default: [] },
+  pdfUrl: { type: String, default: '' },
   brochure: { type: String, default: '' },
   contact: { type: String, trim: true },
   contactEmail: { type: String, trim: true },
@@ -83,6 +85,9 @@ const propertySchema = new mongoose.Schema({
       } else if (rawSub.includes('villa')) {
         normalizedSubcategory = 'Villa';
       }
+      ret.floorPlans = ret.floorPlanImages || [];
+      ret.floorPlanPdf = ret.pdfUrl || '';
+      ret.pdf = ret.pdfUrl || '';
       return ret;
     },
   },

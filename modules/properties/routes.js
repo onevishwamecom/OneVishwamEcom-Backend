@@ -3,10 +3,13 @@ const { protect, adminOnly, optionalAuth } = require('../../middleware/auth');
 const validate = require('../../middleware/validate');
 const upload = require('../../middleware/upload');
 const uploadBrochure = require('../../middleware/uploadBrochure');
+const uploadFloorPlan = require('../../middleware/uploadFloorPlan');
 const { createRules, updateRules } = require('./validator');
 const {
   getAll, getById, getFeatured, getLatest, getSimilar,
   create, update, remove, toggleStatus, getMyProperties, uploadBrochure: uploadBrochureHandler,
+  uploadFloorPlanImages, uploadFloorPlanPdf, uploadFloorPlan: uploadFloorPlanHandler,
+  deleteFloorPlanImage, deleteFloorPlanPdf,
 } = require('./controller');
 
 const router = express.Router();
@@ -23,5 +26,11 @@ router.put('/:id', protect, upload.array('images', 10), updateRules, validate, u
 router.delete('/:id', protect, remove);
 router.patch('/:id/status', protect, toggleStatus);
 router.post('/:id/brochure', protect, uploadBrochure.single('brochure'), uploadBrochureHandler);
+
+router.post('/:id/floor-plan-images', protect, uploadFloorPlan.array('floorPlanImages', 10), uploadFloorPlanImages);
+router.post('/:id/floor-plan-pdf', protect, uploadFloorPlan.single('floorPlanPdf'), uploadFloorPlanPdf);
+router.post('/:id/floor-plan', protect, uploadFloorPlan.array('floorPlans', 10), uploadFloorPlanHandler);
+router.delete('/:id/floor-plan-images', protect, deleteFloorPlanImage);
+router.delete('/:id/floor-plan-pdf', protect, deleteFloorPlanPdf);
 
 module.exports = router;

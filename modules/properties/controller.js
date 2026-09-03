@@ -1,6 +1,7 @@
 const Property = require('./model');
 const createCRUDController = require('../baseController');
 const ApiResponse = require('../../utils/ApiResponse');
+const ApiError = require('../../utils/ApiError');
 const asyncHandler = require('../../utils/asyncHandler');
 const propertyService = require('./propertyService');
 
@@ -92,4 +93,97 @@ const uploadBrochure = asyncHandler(async (req, res) => {
   new ApiResponse(200, { brochure: url }, 'Brochure uploaded successfully').send(res);
 });
 
-module.exports = { getAll, getById, getFeatured, getLatest, getSimilar, create, update, remove, toggleStatus, getMyProperties, uploadBrochure };
+const uploadFloorPlanImages = asyncHandler(async (req, res) => {
+  const property = await Property.findById(req.params.id);
+  if (!property) throw new ApiError(404, 'Property not found');
+  if (property.user && req.user._id.toString() !== property.user.toString() && req.user.role !== 'admin') {
+    throw new ApiError(403, 'Not authorized');
+  }
+  const files = req.files || (req.file ? [req.file] : []);
+  if (files.length === 0) throw new ApiError(400, 'No floor plan image files provided');
+
+  const urls = files.map((f) =>
+    f.path && f.path.startsWith('http') ? f.path : (f.cloudinaryUrl || `/uploads/${f.filename}`)
+  );
+
+  property.floorPlanImages = Array.from(new Set([...(property.floorPlanImages || []), ...urls]));
+  await property.save();
+
+  new ApiResponse(200, { floorPlanImages: property.floorPlanImages, item: property }, 'Floor plan images uploaded successfully').send(res);
+});
+
+const uploadFloorPlanPdf = asyncHandler(async (req, res) => {
+  const property = await Property.findById(req.params.id);
+  if (!property) throw new ApiError(404, 'Property not found');
+  if (property.user && req.user._id.toString() !== property.user.toString() && req.user.role !== 'admin') {
+    throw new ApiError(403, 'Not authorized');
+  }
+  const file = req.file || (req.files && req.files[0]);
+  if (!file) throw new ApiError(400, 'No PDF file provided');
+
+  const url = file.path && file.path.startsWith('http') ? file.path : (file.cloudinaryUrl || `/uploads/${file.filename}`);
+  property.pdfUrl = url;
+  await property.save();
+
+  new ApiResponse(200, { pdfUrl: url, item: property }, 'Floor plan PDF uploaded successfully').send(res);
+});
+
+const uploadFloorPlan = asyncHandler(async (req, res) => {
+  const property = await Property.findById(req.params.id);
+  if (!property) throw new ApiError(404, 'Property not found');
+  if (property.user && req.user._id.toString() !== property.user.toString() && req.user.role !== 'admin') {
+    throw new ApiError(403, 'Not authorized');
+  }
+  const files = req.files || (req.file ? [req.file] : []);
+  if (files.length === 0) throw new ApiError(400, 'No files provided');
+
+  const imageFiles = files.filter(f => f.mimetype !== 'application/pdf');
+  const pdfFiles = files.filter(f => f.mimetype === 'application/pdf');
+
+  if (imageFiles.length > 0) {
+    const imageUrls = imageFiles.map((f) =>
+      f.path && f.path.startsWith('http') ? f.path : (f.cloudinaryUrl || `/uploads/${f.filename}`)
+    );
+    property.floorPlanImages = Array.from(new Set([...(property.floorPlanImages || []), ...imageUrls]));
+  }
+
+  if (pdfFiles.length > 0) {
+    const pdfUrl = pdfFiles[0].path && pdfFiles[0].path.startsWith('http') ? pdfFiles[0].path : (pdfFiles[0].cloudinaryUrl || `/uploads/${pdfFiles[0].filename}`);
+    property.pdfUrl = pdfUrl;
+  }
+
+  await property.save();
+  new ApiResponse(200, { floorPlanImages: property.floorPlanImages, pdfUrl: property.pdfUrl, item: property }, 'Floor plan uploaded successfully').send(res);
+});
+
+const deleteFloorPlanImage = asyncHandler(async (req, res) => {
+  const property = await Property.findById(req.params.id);
+  if (!property) throw new ApiError(404, 'Property not found');
+  if (property.user && req.user._id.toString() !== property.user.toString() && req.user.role !== 'admin') {
+    throw new ApiError(403, 'Not authorized');
+  }
+  const { imageUrl } = req.body;
+  if (!imageUrl) throw new ApiError(400, 'Image URL required');
+
+  property.floorPlanImages = (property.floorPlanImages || []).filter(url => url !== imageUrl);
+  await property.save();
+
+  new ApiResponse(200, { floorPlanImages: property.floorPlanImages, item: property }, 'Floor plan image deleted successfully').send(res);
+});
+
+const deleteFloorPlanPdf = asyncHandler(async (req, res) => {
+  const property = await Property.findById(req.params.id);
+  if (!property) throw new ApiError(404, 'Property not found');
+  if (property.user && req.user._id.toString() !== property.user.toString() && req.user.role !== 'admin') {
+    throw new ApiError(403, 'Not authorized');
+  }
+  property.pdfUrl = '';
+  await property.save();
+
+  new ApiResponse(200, { pdfUrl: '', item: property }, 'Floor plan PDF deleted successfully').send(res);
+});
+
+module.exports = {
+  getAll, getById, getFeatured, getLatest, getSimilar, create, update, remove, toggleStatus, getMyProperties,
+  uploadBrochure, uploadFloorPlanImages, uploadFloorPlanPdf, uploadFloorPlan, deleteFloorPlanImage, deleteFloorPlanPdf
+};
