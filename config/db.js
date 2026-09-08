@@ -1,14 +1,47 @@
 const mongoose = require('mongoose');
 const Admin = require('../models/Admin');
 
+let isConnecting = false;
+let isBootstrapped = false;
+
 const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) {
+    return mongoose.connection;
+  }
+
+  if (isConnecting) {
+    // Wait for in-flight connection attempt
+    while (isConnecting) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (mongoose.connection.readyState >= 1) {
+      return mongoose.connection;
+    }
+  }
+
+  if (!process.env.MONGODB_URI) {
+    throw new Error('MONGODB_URI environment variable is not defined');
+  }
+
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    isConnecting = true;
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: process.env.MONGO_MAX_POOL_SIZE ? parseInt(process.env.MONGO_MAX_POOL_SIZE, 10) : 10,
+    });
     console.log(`MongoDB connected: ${conn.connection.host}`);
-    await bootstrapAdmin();
+    
+    if (!isBootstrapped) {
+      await bootstrapAdmin();
+      isBootstrapped = true;
+    }
+    return conn.connection;
   } catch (error) {
     console.error(`MongoDB connection error: ${error.message}`);
-    process.exit(1);
+    throw error;
+  } finally {
+    isConnecting = false;
   }
 };
 

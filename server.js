@@ -46,6 +46,17 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
+// Ensure DB connection for every request (essential in serverless environments)
+app.use(async (req, res, next) => {
+  if (req.path === '/health') return next(); // fast health check
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -60,8 +71,8 @@ app.get('/health', (req, res) => {
 // Error handler
 app.use(errorHandler);
 
-// Start
-if (process.env.NODE_ENV !== 'test') {
+// Start server for local development
+if (require.main === module && process.env.NODE_ENV !== 'test') {
   connectDB().then(() => {
     const server = app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
@@ -75,6 +86,9 @@ if (process.env.NODE_ENV !== 'test') {
         process.exit(0);
       });
     });
+  }).catch((err) => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
   });
 }
 
