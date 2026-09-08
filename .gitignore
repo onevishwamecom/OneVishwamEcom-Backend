@@ -10,5 +10,5 @@ uploads/
 server.log
 firebase-debug.log
 firebase-debug.*.log
-.firebase/
-
+# backups
+mongo-backup/

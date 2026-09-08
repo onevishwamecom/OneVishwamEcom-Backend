@@ -23,25 +23,35 @@ const connectDB = async () => {
     throw new Error('MONGODB_URI environment variable is not defined');
   }
 
-  try {
-    isConnecting = true;
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      maxPoolSize: process.env.MONGO_MAX_POOL_SIZE ? parseInt(process.env.MONGO_MAX_POOL_SIZE, 10) : 10,
-    });
-    console.log(`MongoDB connected: ${conn.connection.host}`);
-    
-    if (!isBootstrapped) {
-      await bootstrapAdmin();
-      isBootstrapped = true;
+  const maxRetries = 3;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      isConnecting = true;
+      attempt++;
+      const conn = await mongoose.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: process.env.MONGO_MAX_POOL_SIZE ? parseInt(process.env.MONGO_MAX_POOL_SIZE, 10) : 10,
+      });
+      console.log(`MongoDB connected: ${conn.connection.host}`);
+      
+      if (!isBootstrapped) {
+        await bootstrapAdmin();
+        isBootstrapped = true;
+      }
+      return conn.connection;
+    } catch (error) {
+      if (attempt >= maxRetries) {
+        console.error(`MongoDB connection error (attempt ${attempt}/${maxRetries}): ${error.message}`);
+        throw error;
+      }
+      console.warn(`MongoDB connection attempt ${attempt} failed (${error.message}). Retrying in 2s...`);
+      await new Promise((res) => setTimeout(res, 2000));
+    } finally {
+      isConnecting = false;
     }
-    return conn.connection;
-  } catch (error) {
-    console.error(`MongoDB connection error: ${error.message}`);
-    throw error;
-  } finally {
-    isConnecting = false;
   }
 };
 

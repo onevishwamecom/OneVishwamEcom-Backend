@@ -68,8 +68,6 @@ const listerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-listerSchema.index({ phone: 1 }, { unique: true });
-listerSchema.index({ email: 1 }, { unique: true, sparse: true });
 
 listerSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();

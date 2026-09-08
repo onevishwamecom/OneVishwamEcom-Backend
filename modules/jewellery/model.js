@@ -45,7 +45,6 @@ jewellerySchema.index({ gender: 1, status: 1 });
 jewellerySchema.index({ tryAtHome: 1, status: 1 });
 jewellerySchema.index({ aiRecommended: 1, status: 1 });
 jewellerySchema.index({ createdAt: -1 });
-jewellerySchema.index({ numericPrice: 1 });
 jewellerySchema.index({
   name: 'text', title: 'text', description: 'text', category: 'text', metalType: 'text', 'store.city': 'text',
 }, { weights: { name: 10, title: 10, category: 5, metalType: 5, description: 1, 'store.city': 3 }, name: 'jewellery_search' });
