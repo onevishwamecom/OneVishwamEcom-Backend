@@ -32,21 +32,39 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
   });
 }
 
-const fileFilter = (req, file, cb) => {
+const imageFileFilter = (req, file, cb) => {
   const allowed = /jpeg|jpg|png|gif|webp|avif/;
   const extname = allowed.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowed.test(file.mimetype);
   if (extname && mimetype) {
     cb(null, true);
   } else {
-    cb(new ApiError(400, 'Only image files are allowed'), false);
+    cb(new ApiError(400, 'Only image files are allowed (JPEG, PNG, WebP, GIF, AVIF)'), false);
+  }
+};
+
+const videoFileFilter = (req, file, cb) => {
+  const allowed = /mp4|webm|mov|avi/;
+  const extname = allowed.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowed.test(file.mimetype);
+  if (extname && mimetype) {
+    cb(null, true);
+  } else {
+    cb(new ApiError(400, 'Only video files are allowed (MP4, WebM, MOV, AVI)'), false);
   }
 };
 
 const upload = multer({
   storage,
-  fileFilter,
+  fileFilter: imageFileFilter,
   limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024 },
 });
 
+const uploadVideo = multer({
+  storage,
+  fileFilter: videoFileFilter,
+  limits: { fileSize: parseInt(process.env.MAX_VIDEO_SIZE) || 10 * 1024 * 1024 },
+});
+
 module.exports = upload;
+module.exports.uploadVideo = uploadVideo;
