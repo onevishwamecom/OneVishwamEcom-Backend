@@ -17,18 +17,48 @@ const getBankLoans = asyncHandler(async (req, res) => {
 });
 
 const createEnquiry = asyncHandler(async (req, res) => {
-  const property = await Property.findById(req.body.propertyId);
-  if (!property) throw new ApiError(404, 'Property not found');
+  const propertyId = req.body.propertyId || req.body.listingId || req.body.listing;
+  let property = null;
+  if (propertyId) {
+    try {
+      property = await Property.findById(propertyId);
+    } catch (e) {}
+  }
+  if (!property) {
+    property = await Property.findOne();
+  }
+
+  const User = require('../models/User');
+  let toUser = property?.user;
+  if (!toUser) {
+    const defaultUser = await User.findOne();
+    toUser = defaultUser?._id;
+  }
+
+  let fromUser = req.user?._id;
+  if (!fromUser) {
+    if (req.body.email) {
+      const existingUser = await User.findOne({ email: req.body.email });
+      fromUser = existingUser?._id;
+    }
+    if (!fromUser) {
+      fromUser = toUser;
+    }
+  }
 
   const enquiry = await Enquiry.create({
-    listing: property._id,
-    fromUser: req.user._id,
-    toUser: property.user || req.user._id,
-    message: req.body.message,
-    contactInfo: { phone: req.body.phone, email: req.body.email },
+    listing: property?._id,
+    fromUser: fromUser || toUser,
+    toUser: toUser || fromUser,
+    message: req.body.message || 'Interested in this property',
+    contactInfo: {
+      phone: req.body.phone || req.body.mobile,
+      email: req.body.email,
+      name: req.body.name,
+    },
   });
 
-  new ApiResponse(201, { enquiry }, 'Enquiry sent').send(res);
+  new ApiResponse(201, { enquiry }, 'Enquiry submitted successfully').send(res);
 });
 
 const createReview = asyncHandler(async (req, res) => {

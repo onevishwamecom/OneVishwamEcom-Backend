@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const validate = require('../middleware/validate');
-const { protect } = require('../middleware/auth');
+const { protect, optionalAuth } = require('../middleware/auth');
 const {
   getBankLoans,
   createEnquiry,
@@ -16,8 +16,8 @@ router.get('/users/:userId/reviews', getUserReviews);
 
 router.post(
   '/enquiries',
-  protect,
-  [body('propertyId').isMongoId(), body('message').trim().notEmpty().withMessage('Message is required')],
+  optionalAuth,
+  [body('message').trim().notEmpty().withMessage('Message is required')],
   validate,
   createEnquiry
 );

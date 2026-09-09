@@ -1,4 +1,5 @@
 const express = require('express');
+const modules = require('../modules');
 const authRoutes = require('./auth');
 const listerRoutes = require('./lister');
 const userRoutes = require('./users');
@@ -21,6 +22,7 @@ const router = express.Router();
 router.use('/v1/auth', authRoutes);
 router.use('/v1/users', userRoutes);
 router.use('/v1/properties', propertyRoutes);
+modules.forEach(mod => router.use(`/${mod.id}`, mod.routes));
 router.use('/v1/property-requirements', propertyRequirementRoutes);
 router.use('/auth', authRoutes);
 router.use('/auth/lister', listerRoutes);

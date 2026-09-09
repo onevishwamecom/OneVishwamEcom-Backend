@@ -1,22 +1,28 @@
-const { onRequest } = require('firebase-functions/v2/https');
-const { setGlobalOptions } = require('firebase-functions/v2');
-const app = require('./app');
+const { onRequest } = require("firebase-functions/v2/https");
+const { setGlobalOptions } = require("firebase-functions/v2");
+require("dotenv").config();
 
-// Set global options for all 2nd Gen Firebase Functions
+// Import configured Express application
+const app = require("./app");
+
+// Global options for 2nd Gen Firebase Functions
 setGlobalOptions({
-  region: process.env.FIREBASE_REGION || 'asia-south1',
-  maxInstances: 10,
+  region: "asia-south1",
+  maxInstances: 2,
 });
 
 /**
- * Cloud Function entrypoint for OneVishwam Express Backend.
- * All Express routes (/api/..., /health, etc.) are served through this function.
+ * Cloud Function entrypoint (Gen 2) for OneVishwam Express Backend.
+ * Region: asia-south1 (Mumbai) gives optimal low latency to users in India.
+ * Memory: 512MiB, maxInstances: 2 to guarantee execution inside zero-cost quotas.
  */
 exports.api = onRequest(
   {
-    cors: true,
+    region: "asia-south1",
+    memory: "512MiB",
     timeoutSeconds: 60,
-    memory: '512MiB',
+    maxInstances: 2,
+    cors: true,
   },
   app
 );

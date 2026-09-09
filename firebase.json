@@ -9,11 +9,18 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "uploads",
-        ".env",
         ".env.local",
         "*.log"
       ]
     }
-  ]
+  ],
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    }
+  }
 }
-
