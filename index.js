@@ -1,6 +1,6 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
-const app = require('./server');
+const app = require('./app');
 
 // Set global options for all 2nd Gen Firebase Functions
 setGlobalOptions({
@@ -20,4 +20,3 @@ exports.api = onRequest(
   },
   app
 );
-
