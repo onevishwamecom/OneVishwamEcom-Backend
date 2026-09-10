@@ -6,12 +6,16 @@ const { BCRYPT_SALT_ROUNDS } = require('../config/authConfig');
 
 const userSchema = new mongoose.Schema(
   {
+    firebaseUid: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     fullName: {
       type: String,
-      required: [true, 'Full name is required'],
       trim: true,
-      minlength: [2, 'Name must be at least 2 characters'],
-      maxlength: [50, 'Name cannot exceed 50 characters'],
+      default: 'User',
     },
     email: {
       type: String,
@@ -22,10 +26,15 @@ const userSchema = new mongoose.Schema(
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
     },
+    phoneNumber: {
+      type: String,
+      trim: true,
+    },
     mobile: {
       type: String,
-      required: [true, 'Mobile number is required'],
+      required: false,
       unique: true,
+      sparse: true,
       trim: true,
       match: [/^\+?[\d\s-]{10,15}$/, 'Please provide a valid mobile number'],
     },
@@ -35,9 +44,6 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
-    // Application-level Lister business ID. Derived from the VERIFIED phone
-    // number (normalized E.164 digits, e.g. "919876543210"). This is NOT the
-    // MongoDB _id — it is the stable business identifier for listings.
     listerId: {
       type: String,
       unique: true,
@@ -49,9 +55,13 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
+      required: false,
       minlength: [6, 'Password must be at least 6 characters'],
       select: false,
+    },
+    avatar: {
+      type: String,
+      default: '',
     },
     profileImage: {
       type: String,
@@ -59,16 +69,21 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['user', 'admin'],
+      enum: ['user', 'lister', 'admin'],
       default: 'user',
     },
     city: { type: String, trim: true, default: '' },
     area: { type: String, trim: true, default: '' },
     pincode: { type: String, trim: true, default: '' },
     isEmailVerified: { type: Boolean, default: false },
+    status: {
+      type: String,
+      enum: ['active', 'suspended', 'deactivated', 'deleted'],
+      default: 'active',
+    },
     accountStatus: {
       type: String,
-      enum: ['active', 'suspended', 'deactivated'],
+      enum: ['active', 'suspended', 'deactivated', 'deleted'],
       default: 'active',
     },
     lastLogin: { type: Date },
@@ -85,18 +100,19 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.password || !this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
 userSchema.methods.comparePassword = async function (candidate) {
+  if (!this.password) return false;
   return bcrypt.compare(candidate, this.password);
 };
 
 userSchema.methods.generateAccessToken = function () {
-  return jwt.sign({ id: this._id, role: this.role, accountType: 'user' }, process.env.JWT_SECRET, {
+  return jwt.sign({ id: this._id, role: this.role, accountType: 'user' }, process.env.JWT_SECRET || 'fallback-secret', {
     expiresIn: process.env.JWT_ACCESS_EXPIRE || '15m',
   });
 };
@@ -104,7 +120,7 @@ userSchema.methods.generateAccessToken = function () {
 userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     { id: this._id, accountType: 'user', jti: crypto.randomBytes(16).toString('hex') },
-    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
+    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'fallback-secret',
     { expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d' }
   );
 };
@@ -112,22 +128,25 @@ userSchema.methods.generateRefreshToken = function () {
 userSchema.methods.toProfileJSON = function () {
   return {
     id: this._id,
-    accountType: 'user',
+    firebaseUid: this.firebaseUid,
+    accountType: this.role === 'lister' ? 'lister' : this.role === 'admin' ? 'admin' : 'user',
     fullName: this.fullName,
     name: this.fullName,
     email: this.email,
-    mobile: this.mobile,
-    phone: this.phone || null,
+    phoneNumber: this.phoneNumber || this.mobile || this.phone || '',
+    mobile: this.mobile || this.phoneNumber || '',
+    phone: this.phone || this.phoneNumber || this.mobile || null,
     listerId: this.listerId || null,
-    profileImage: this.profileImage,
+    avatar: this.avatar || this.profileImage || '',
+    profileImage: this.profileImage || this.avatar || '',
     role: this.role,
     city: this.city,
     area: this.area,
     pincode: this.pincode,
     isEmailVerified: this.isEmailVerified,
     phoneVerified: this.phoneVerified,
-    accountStatus: this.accountStatus,
-    status: this.accountStatus,
+    accountStatus: this.accountStatus || this.status,
+    status: this.status || this.accountStatus,
     lastLogin: this.lastLogin,
     createdAt: this.createdAt,
     notifications: {
@@ -140,21 +159,25 @@ userSchema.methods.toProfileJSON = function () {
 userSchema.methods.toListerJSON = function () {
   return {
     id: this._id,
+    firebaseUid: this.firebaseUid,
     accountType: 'lister',
     listerId: this.listerId || null,
     name: this.fullName,
     fullName: this.fullName,
     email: this.email,
-    phone: this.phone || this.mobile || null,
-    mobile: this.mobile,
-    profileImage: this.profileImage,
+    phone: this.phone || this.phoneNumber || this.mobile || null,
+    phoneNumber: this.phoneNumber || this.phone || this.mobile || '',
+    mobile: this.mobile || this.phoneNumber || '',
+    avatar: this.avatar || this.profileImage || '',
+    profileImage: this.profileImage || this.avatar || '',
     role: this.role,
     city: this.city,
     area: this.area,
     pincode: this.pincode,
     phoneVerified: this.phoneVerified,
     isEmailVerified: this.isEmailVerified,
-    accountStatus: this.accountStatus,
+    accountStatus: this.accountStatus || this.status,
+    status: this.status || this.accountStatus,
     lastLogin: this.lastLogin,
     createdAt: this.createdAt,
     notifications: {
@@ -172,4 +195,4 @@ userSchema.methods.generateAuthResponse = async function () {
   return { accessToken, refreshToken, user: this.toProfileJSON() };
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);

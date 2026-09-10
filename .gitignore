@@ -12,3 +12,8 @@ firebase-debug.log
 firebase-debug.*.log
 # backups
 mongo-backup/
+
+# build & transpiled files
+dist/
+**/dist/
+*.dev.js
