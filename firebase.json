@@ -9,6 +9,8 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "uploads",
+        ".env",
+        ".env.*",
         ".env.local",
         "*.log"
       ]
