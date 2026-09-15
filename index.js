@@ -37,6 +37,7 @@ exports.api = onRequest(
  */
 exports.cleanupDeletedUser = functions
   .region("asia-south1")
+  .runWith({ secrets: ["MONGODB_URI"] })
   .auth.user()
   .onDelete(async (user) => {
     try {

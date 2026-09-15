@@ -34,6 +34,7 @@ const login = asyncHandler(async (req, res) => {
   await admin.save({ validateBeforeSave: false });
 
   const result = await admin.generateAuthResponse();
+  console.log('🔑 [ADMIN AUTH TOKEN]:', result.accessToken);
   new ApiResponse(200, result, 'Admin login successful').send(res);
 });
 
