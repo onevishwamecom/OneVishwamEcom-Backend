@@ -40,31 +40,87 @@ const verifyFirebaseToken = asyncHandler(async (req, res, next) => {
   // 1. First attempt Firebase ID Token verification
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
-    
-    // Find associated user in MongoDB Atlas by firebaseUid or email
+    const email = decodedToken.email ? decodedToken.email.toLowerCase() : '';
+    const isAdminEmail = email === (process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@onevishwam.com').toLowerCase();
+
+    // Check Admin collection
+    let adminAccount = await Admin.findOne({
+      $or: [
+        { firebaseUid: decodedToken.uid },
+        ...(email ? [{ email }] : []),
+      ],
+    });
+
+    if (!adminAccount && isAdminEmail) {
+      adminAccount = await Admin.create({
+        email,
+        name: decodedToken.name || process.env.ADMIN_BOOTSTRAP_NAME || 'Super Admin',
+        password: process.env.ADMIN_BOOTSTRAP_PASSWORD || 'Admin@789',
+        role: 'super-admin',
+        firebaseUid: decodedToken.uid,
+        isActive: true,
+      });
+    }
+
+    if (adminAccount) {
+      if (!adminAccount.firebaseUid) {
+        adminAccount.firebaseUid = decodedToken.uid;
+        await adminAccount.save({ validateBeforeSave: false });
+      }
+      req.user = adminAccount;
+      req.auth = {
+        id: adminAccount._id,
+        accountType: 'admin',
+        role: adminAccount.role || 'super-admin',
+      };
+      req.firebaseClaims = decodedToken;
+      return next();
+    }
+
+    // Check Lister collection
+    let listerAccount = await Lister.findOne({
+      $or: [
+        { firebaseUid: decodedToken.uid },
+        ...(email ? [{ email }] : []),
+      ],
+    });
+
+    if (listerAccount) {
+      if (!listerAccount.firebaseUid) {
+        listerAccount.firebaseUid = decodedToken.uid;
+        await listerAccount.save({ validateBeforeSave: false });
+      }
+      req.user = listerAccount;
+      req.auth = {
+        id: listerAccount._id,
+        accountType: 'lister',
+        role: 'lister',
+        listerId: listerAccount.listerId || null,
+      };
+      req.firebaseClaims = decodedToken;
+      return next();
+    }
+
+    // Check / Provision User collection
     let user = await User.findOne({ firebaseUid: decodedToken.uid });
-    
-    if (!user && decodedToken.email) {
-      user = await User.findOne({ email: decodedToken.email.toLowerCase() });
+    if (!user && email) {
+      user = await User.findOne({ email });
       if (user && !user.firebaseUid) {
         user.firebaseUid = decodedToken.uid;
         await user.save({ validateBeforeSave: false });
       }
     }
 
-    // Auto-provision if user exists in Firebase but not yet saved in MongoDB
     if (!user) {
-      // Admin email - set role to admin
-      const isAdminEmail = decodedToken.email === 'admin@onevishwam.com';
       user = await User.create({
         firebaseUid: decodedToken.uid,
-        email: decodedToken.email ? decodedToken.email.toLowerCase() : undefined,
+        email: email || undefined,
         fullName: decodedToken.name || 'User',
         avatar: decodedToken.picture || '',
         profileImage: decodedToken.picture || '',
         phoneNumber: decodedToken.phone_number || '',
         mobile: decodedToken.phone_number || undefined,
-        role: isAdminEmail ? 'admin' : 'user',
+        role: 'user',
         status: 'active',
         accountStatus: 'active',
         isEmailVerified: decodedToken.email_verified || false,

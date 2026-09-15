@@ -31,6 +31,7 @@ const adminSchema = new mongoose.Schema(
       enum: ['admin', 'super-admin'],
       default: 'admin',
     },
+    firebaseUid: { type: String, sparse: true, index: true },
     refreshToken: { type: String, select: false },
     lastLogin: { type: Date },
     isActive: { type: Boolean, default: true },
