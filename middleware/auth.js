@@ -54,6 +54,8 @@ const verifyFirebaseToken = asyncHandler(async (req, res, next) => {
 
     // Auto-provision if user exists in Firebase but not yet saved in MongoDB
     if (!user) {
+      // Admin email - set role to admin
+      const isAdminEmail = decodedToken.email === 'admin@onevishwam.com';
       user = await User.create({
         firebaseUid: decodedToken.uid,
         email: decodedToken.email ? decodedToken.email.toLowerCase() : undefined,
@@ -62,7 +64,7 @@ const verifyFirebaseToken = asyncHandler(async (req, res, next) => {
         profileImage: decodedToken.picture || '',
         phoneNumber: decodedToken.phone_number || '',
         mobile: decodedToken.phone_number || undefined,
-        role: 'user',
+        role: isAdminEmail ? 'admin' : 'user',
         status: 'active',
         accountStatus: 'active',
         isEmailVerified: decodedToken.email_verified || false,
