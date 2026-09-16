@@ -89,6 +89,26 @@ app.get(['/health', '/api/health'], (req, res) => {
   });
 });
 
+app.get(['/health/db', '/api/health/db'], async (req, res) => {
+  try {
+    await connectDB();
+    const mongoose = require('mongoose');
+    await mongoose.connection.db.admin().ping();
+    res.json({
+      success: true,
+      status: 'active',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      status: 'error',
+      message: err.message,
+    });
+  }
+});
+
 // Mount API routes under /api (standard) and / (for Cloud Function stripped paths)
 app.use('/api', routes);
 app.use('/', routes);
