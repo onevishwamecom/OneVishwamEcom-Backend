@@ -7,6 +7,7 @@ const smsService = require('./smsService');
 const imageService = require('./imageService');
 const ApiError = require('../utils/ApiError');
 const { normalizePhone } = require('../utils/phone');
+const firebaseAdmin = require('../config/firebaseAdmin');
 const {
   OTP_MAX_ATTEMPTS,
   OTP_RESEND_COOLDOWN_SECONDS,
@@ -104,6 +105,48 @@ async function verifyOtpForPhone(phone, otp) {
 }
 
 /**
+ * Verify a Firebase ID token generated from Firebase Phone Auth.
+ * Confirms the decoded phone number matches the normalized phone.
+ */
+async function verifyFirebaseTokenForPhone(idToken, phone) {
+  if (!idToken) {
+    throw new ApiError(400, 'Firebase ID token is required');
+  }
+
+  let decodedToken;
+  try {
+    decodedToken = await firebaseAdmin.getAuth().verifyIdToken(idToken);
+  } catch (err) {
+    console.error('[Firebase Auth] verifyIdToken error:', err.message);
+    throw new ApiError(401, 'Invalid or expired Firebase verification token. Please verify OTP again.');
+  }
+
+  const tokenPhone = decodedToken.phone_number;
+  if (!tokenPhone) {
+    throw new ApiError(400, 'Firebase token does not contain a verified phone number');
+  }
+
+  const normalizedTokenPhone = normalizePhone(tokenPhone);
+  const normalizedInputPhone = normalizePhone(phone);
+
+  if (normalizedTokenPhone !== normalizedInputPhone) {
+    throw new ApiError(400, 'Verified phone number does not match the provided phone number');
+  }
+
+  // Create a verified ListerOtp record in DB so assertPhoneOtpVerified passes if called later
+  await ListerOtp.create({
+    phone: normalizedInputPhone,
+    purpose: 'LISTER_REGISTRATION',
+    otpHash: 'FIREBASE_VERIFIED',
+    attempts: 0,
+    isUsed: true,
+    expiresAt: new Date(Date.now() + ListerOtp.OTP_EXPIRY_MS),
+  });
+
+  return { phone: normalizedInputPhone, verified: true };
+}
+
+/**
  * Confirm a phone has an OTP that was successfully verified recently
  * (i.e. a pending registration). This is the "gate" between OTP and account
  * creation so that incomplete accounts are never created.
@@ -128,15 +171,19 @@ async function assertPhoneOtpVerified(normalized) {
   return true;
 }
 
-async function registerLister({ name, email, phone, password, confirmPassword }) {
+async function registerLister({ name, email, phone, password, confirmPassword, firebaseIdToken }) {
   if (password !== confirmPassword) {
     throw new ApiError(400, 'Passwords do not match');
   }
 
   const normalized = normalizePhone(phone);
 
-  // Phone must have been OTP verified before an account is created.
-  await assertPhoneOtpVerified(normalized);
+  // If Firebase ID token is provided, verify it directly; otherwise check DB OTP record
+  if (firebaseIdToken) {
+    await verifyFirebaseTokenForPhone(firebaseIdToken, phone);
+  } else {
+    await assertPhoneOtpVerified(normalized);
+  }
 
   // Reject if this phone is already associated with ANY account.
   const existingPhone = await Lister.findOne({
@@ -351,6 +398,7 @@ async function listerLogout({ refreshToken }) {
 module.exports = {
   sendOtpToPhone,
   verifyOtpForPhone,
+  verifyFirebaseTokenForPhone,
   registerLister,
   listerLogin,
   getLister,

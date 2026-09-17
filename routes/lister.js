@@ -4,7 +4,7 @@ const validate = require('../middleware/validate');
 const { protect } = require('../middleware/auth');
 const { uploadProfileImage } = require('../middleware/uploadProfileImage');
 const { sendOtpRules, verifyOtpRules, registerRules, loginRules, updateProfileRules } = require('../validators/listerValidator');
-const { sendOtp, verifyOtp, register, login, getMe, updateProfile, uploadProfileImage: uploadProfileImageController, logout } = require('../controllers/listerController');
+const { sendOtp, verifyOtp, verifyFirebaseOtp, register, login, getMe, updateProfile, uploadProfileImage: uploadProfileImageController, logout } = require('../controllers/listerController');
 
 const router = express.Router();
 
@@ -35,6 +35,7 @@ const router = express.Router();
 
 router.post('/send-otp', sendOtpRules, validate, sendOtp);
 router.post('/verify-otp', verifyOtpRules, validate, verifyOtp);
+router.post('/verify-firebase-otp', verifyFirebaseOtp);
 router.post('/register', registerRules, validate, register);
 router.post('/login', loginRules, validate, login);
 router.post('/logout', logout);

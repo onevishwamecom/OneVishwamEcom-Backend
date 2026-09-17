@@ -12,6 +12,11 @@ const verifyOtp = asyncHandler(async (req, res) => {
   new ApiResponse(200, result, 'OTP verified successfully').send(res);
 });
 
+const verifyFirebaseOtp = asyncHandler(async (req, res) => {
+  const result = await listerService.verifyFirebaseTokenForPhone(req.body.idToken, req.body.phone);
+  new ApiResponse(200, result, 'Phone verified successfully via Firebase').send(res);
+});
+
 const register = asyncHandler(async (req, res) => {
   const result = await listerService.registerLister(req.body);
   new ApiResponse(201, result, 'Registration successful').send(res);
@@ -42,4 +47,4 @@ const logout = asyncHandler(async (req, res) => {
   new ApiResponse(200, null, 'Logged out successfully').send(res);
 });
 
-module.exports = { sendOtp, verifyOtp, register, login, getMe, updateProfile, uploadProfileImage, logout };
+module.exports = { sendOtp, verifyOtp, verifyFirebaseOtp, register, login, getMe, updateProfile, uploadProfileImage, logout };
