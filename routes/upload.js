@@ -52,15 +52,27 @@ router.post('/media', protect, async (req, res, next) => {
       if (parsed.length > 11) return next(new ApiError(400, 'Maximum 10 images + 1 video allowed'));
 
       try {
-        const bucket = getStorage().bucket();
+        const crypto = require('crypto');
+        const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
+        const bucket = getStorage().bucket(BUCKET_NAME);
         const uploaded = await Promise.all(parsed.map(async (f) => {
           const isVideo = /^video\//.test(f.mimetype);
           const folder = isVideo ? 'products/videos' : 'products/images';
           const ext = path.extname(f.originalname).toLowerCase() || (isVideo ? '.mp4' : '.jpg');
           const fname = `${Date.now()}-${Math.floor(Math.random() * 1e9)}${ext}`;
           const storagePath = `${folder}/${fname}`;
-          await bucket.file(storagePath).save(f.buffer, { metadata: { contentType: f.mimetype }, resumable: false, public: true });
-          return { url: `https://storage.googleapis.com/${bucket.name}/${storagePath}`, isVideo };
+          const token = crypto.randomUUID();
+          await bucket.file(storagePath).save(f.buffer, {
+            metadata: {
+              contentType: f.mimetype,
+              metadata: { firebaseStorageDownloadTokens: token },
+            },
+            resumable: false,
+          });
+          return {
+            url: `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`,
+            isVideo,
+          };
         }));
 
         new ApiResponse(200, {
