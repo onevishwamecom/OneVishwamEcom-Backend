@@ -5,16 +5,16 @@
  */
 const { makeImageUploadMiddleware, makeVideoUploadMiddleware } = require('./firebaseStorage');
 
-// upload.array('images', 10) equivalent — attaches req.uploadedFiles
+// upload.array('images', 5) — max 5 images, max 1MB each
 const upload = {
-  array: (fieldname, maxCount = 10) => makeImageUploadMiddleware('products/images', maxCount, 5),
-  single: (fieldname) => makeImageUploadMiddleware('products/images', 1, 5),
+  array: (fieldname, maxCount = 5) => makeImageUploadMiddleware('products/images', maxCount, 1),
+  single: (fieldname) => makeImageUploadMiddleware('products/images', 1, 1),
 };
 
-// Video upload — attaches req.uploadedFile
+// Video upload — max 1 video, max 10MB
 const uploadVideo = {
-  single: (fieldname) => makeVideoUploadMiddleware('products/videos', 50),
-  fields: (fields) => makeVideoUploadMiddleware('products/videos', 50), // simplified for /media route
+  single: (fieldname) => makeVideoUploadMiddleware('products/videos', 10),
+  fields: (fields) => makeVideoUploadMiddleware('products/videos', 10),
 };
 
 module.exports = upload;
