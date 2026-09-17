@@ -153,7 +153,15 @@ const getAllListings = asyncHandler(async (req, res) => {
         .limit(l)
         .lean();
       if (items.length > 0) {
-        results[mod.id] = items;
+        results[mod.id] = items.map((item) => {
+          const v = item.video || item.videoUrl || (Array.isArray(item.videos) && item.videos[0]) || '';
+          return {
+            ...item,
+            video: v,
+            videoUrl: v,
+            videos: Array.isArray(item.videos) && item.videos.length > 0 ? item.videos : (v ? [v] : []),
+          };
+        });
         total += items.length;
       }
     } catch { }
