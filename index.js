@@ -11,21 +11,28 @@ const User = require("./models/User");
 // Global options for 2nd Gen Firebase Functions
 setGlobalOptions({
   region: "asia-south1",
-  maxInstances: 2,
+  minInstances: 0,
+  maxInstances: 3,
+  concurrency: 80,
 });
 
 /**
  * Cloud Function entrypoint (Gen 2) for OneVishwam Express Backend.
  * Region: asia-south1 (Mumbai) gives optimal low latency to users in India.
- * Memory: 512MiB, maxInstances: 2 to guarantee execution inside zero-cost quotas.
+ * Memory: 256MiB, CPU: 0.25 fractional vCPU, concurrency: 80 to maximize
+ * multiplexed request handling per container inside zero-cost quotas.
+ * minInstances: 0 prevents any idle compute billing.
  * Secret: MONGODB_URI bound via Google Cloud Secret Manager for production security.
  */
 exports.api = onRequest(
   {
     region: "asia-south1",
-    memory: "512MiB",
-    timeoutSeconds: 60,
-    maxInstances: 2,
+    memory: "256MiB",
+    cpu: 0.25,
+    concurrency: 80,
+    minInstances: 0,
+    maxInstances: 3,
+    timeoutSeconds: 30,
     secrets: ["MONGODB_URI"],
     cors: true,
   },
@@ -37,7 +44,12 @@ exports.api = onRequest(
  */
 exports.cleanupDeletedUser = functions
   .region("asia-south1")
-  .runWith({ secrets: ["MONGODB_URI"] })
+  .runWith({
+    secrets: ["MONGODB_URI"],
+    memory: "128MB",
+    timeoutSeconds: 30,
+    maxInstances: 1,
+  })
   .auth.user()
   .onDelete(async (user) => {
     try {

@@ -6,13 +6,25 @@
       "ignore": [
         "node_modules",
         ".git",
+        ".github/**",
+        ".github-backup/**",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "uploads",
+        "uploads/**",
         ".env",
         ".env.*",
         ".env.local",
-        "*.log"
+        "*.log",
+        "mongo-backup/**",
+        "tests/**",
+        "__tests__/**",
+        "scripts/**",
+        "*.dev.js",
+        "**/dist/**",
+        "dist/**",
+        "*.md",
+        ".vscode/**",
+        ".DS_Store"
       ]
     }
   ],

@@ -27,8 +27,9 @@ const connectDB = async () => {
 
   const opts = {
     serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-    maxPoolSize: process.env.MONGO_MAX_POOL_SIZE ? parseInt(process.env.MONGO_MAX_POOL_SIZE, 10) : 10,
+    connectTimeoutMS: 5000,
+    socketTimeoutMS: 20000,
+    maxPoolSize: process.env.MONGO_MAX_POOL_SIZE ? parseInt(process.env.MONGO_MAX_POOL_SIZE, 10) : 5,
     autoIndex: process.env.NODE_ENV !== 'production',
   };
 

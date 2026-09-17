@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const morgan = require('morgan');
 const path = require('path');
 const connectDB = require('./config/db');
@@ -9,6 +10,9 @@ const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
+
+// Response compression (reduces egress bandwidth and function execution time)
+app.use(compression());
 
 // Security headers
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -66,9 +70,21 @@ app.use((req, res, next) => {
   next();
 });
 
-// Ensure MongoDB connection for every request (reused and safe for serverless Cloud Functions)
+// Static uploads serving (served directly before DB connection check)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Ensure MongoDB connection only for functional API requests (reused and safe for serverless Cloud Functions)
+// Preflight OPTIONS, health endpoints, static assets, and favicon bypass DB connections to save compute/sockets.
 app.use(async (req, res, next) => {
-  if (req.path === '/health' || req.path === '/api/health') return next();
+  if (
+    req.method === 'OPTIONS' ||
+    req.path === '/health' ||
+    req.path === '/api/health' ||
+    req.path.startsWith('/uploads') ||
+    req.path === '/favicon.ico'
+  ) {
+    return next();
+  }
   try {
     await connectDB();
     next();
@@ -76,9 +92,6 @@ app.use(async (req, res, next) => {
     next(err);
   }
 });
-
-// Static uploads serving
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check routes
 app.get(['/health', '/api/health'], (req, res) => {
