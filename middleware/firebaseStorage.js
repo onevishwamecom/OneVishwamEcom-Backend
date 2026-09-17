@@ -17,14 +17,14 @@
 
 const Busboy = require('busboy');
 const { Readable } = require('stream');
-const admin = require('firebase-admin');
+const { getStorage } = require('firebase-admin/storage');
 const path = require('path');
 const ApiError = require('../utils/ApiError');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getBucket() {
-  return admin.storage().bucket();
+  return getStorage().bucket();
 }
 
 /** Generate a unique filename preserving the original extension */

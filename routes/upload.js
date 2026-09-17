@@ -3,6 +3,7 @@ const { protect } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const uploadFloorPlan = require('../middleware/uploadFloorPlan');
 const uploadBrochure = require('../middleware/uploadBrochure');
+const { getStorage } = require('firebase-admin/storage');
 const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 
@@ -30,7 +31,6 @@ router.post('/media', protect, async (req, res, next) => {
   try {
     const Busboy = require('busboy');
     const { Readable } = require('stream');
-    const admin = require('firebase-admin');
     const path = require('path');
 
     const rawBody = req.rawBody;
@@ -52,7 +52,7 @@ router.post('/media', protect, async (req, res, next) => {
       if (parsed.length > 11) return next(new ApiError(400, 'Maximum 10 images + 1 video allowed'));
 
       try {
-        const bucket = admin.storage().bucket();
+        const bucket = getStorage().bucket();
         const uploaded = await Promise.all(parsed.map(async (f) => {
           const isVideo = /^video\//.test(f.mimetype);
           const folder = isVideo ? 'products/videos' : 'products/images';
