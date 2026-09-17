@@ -57,8 +57,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Firebase Admin SDK — initialise once (no-op if already done by index.js)
-if (!admin.apps.length) {
-  admin.initializeApp({
+const { getApps, initializeApp: initAdmin } = require('firebase-admin/app');
+if (!getApps().length) {
+  initAdmin({
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app',
   });
 }
