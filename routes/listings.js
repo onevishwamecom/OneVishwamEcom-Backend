@@ -33,6 +33,18 @@ const ADMIN_STATUS_TRANSITIONS = {
   cancel: { from: ['pending', 'changes-required', 'approved'], to: 'cancelled' },
 };
 
+function normalizeListingItem(item) {
+  if (!item) return item;
+  const raw = typeof item.toJSON === 'function' ? item.toJSON() : item;
+  const v = raw.video || raw.videoUrl || (Array.isArray(raw.videos) && raw.videos[0]) || '';
+  return {
+    ...raw,
+    video: v,
+    videoUrl: v,
+    videos: Array.isArray(raw.videos) && raw.videos.length > 0 ? raw.videos : (v ? [v] : []),
+  };
+}
+
 // GET /api/listings?flatten=1  -> flat array with `_type`
 // GET /api/listings           -> { <moduleId>: [items] }
 router.get('/', protect, asyncHandler(async (req, res) => {
@@ -48,8 +60,9 @@ router.get('/', protect, asyncHandler(async (req, res) => {
 
     const items = await mod.model.find(filter).sort({ createdAt: -1 }).limit(500).lean();
     if (items.length === 0) continue;
-    grouped[mod.id] = items;
-    for (const item of items) {
+    const normalizedItems = items.map(normalizeListingItem);
+    grouped[mod.id] = normalizedItems;
+    for (const item of normalizedItems) {
       flat.push({ ...item, _type: mod.id });
     }
   }
@@ -82,7 +95,7 @@ router.post('/', protect, asyncHandler(async (req, res) => {
   }
 
   const item = await mod.model.create(data);
-  new ApiResponse(201, { item }, 'Listing created successfully. It is pending admin approval.').send(res);
+  new ApiResponse(201, { item: normalizeListingItem(item) }, 'Listing created successfully. It is pending admin approval.').send(res);
 }));
 
 function isOwnerOrAdmin(item, req) {
@@ -109,7 +122,7 @@ router.get('/:type/:id', protect, asyncHandler(async (req, res) => {
   const item = await mod.model.findById(req.params.id).lean();
   if (!item) throw new ApiError(404, 'Listing not found');
   isOwnerOrAdmin(item, req);
-  new ApiResponse(200, { item }, 'Listing fetched').send(res);
+  new ApiResponse(200, { item: normalizeListingItem(item) }, 'Listing fetched').send(res);
 }));
 
 // PATCH /api/listings/:type/:id — update owned listing.
@@ -145,7 +158,7 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   }
 
   await item.save();
-  new ApiResponse(200, { item }, 'Listing updated successfully').send(res);
+  new ApiResponse(200, { item: normalizeListingItem(item) }, 'Listing updated successfully').send(res);
 }));
 
 // DELETE /api/listings/:type/:id — delete owned listing.
@@ -196,7 +209,7 @@ router.get('/admin/all', protect, adminOnly, asyncHandler(async (req, res) => {
         .limit(l)
         .lean();
       if (items.length > 0) {
-        results[mod.id] = items;
+        results[mod.id] = items.map(normalizeListingItem);
         total += items.length;
       }
     } catch { }

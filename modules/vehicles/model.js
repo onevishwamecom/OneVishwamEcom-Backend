@@ -34,6 +34,7 @@ const vehicleSchema = new mongoose.Schema({
   variants: { type: Number, default: 1 },
   images: { type: [String], default: [] },
   video: { type: String, default: '', trim: true },
+  videoUrl: { type: String, default: '', trim: true },
   videos: { type: [String], default: [] },
   description: { type: String, maxlength: 5000 },
   transmission: { type: String, enum: ['Manual', 'Automatic', 'CVT', 'DCT', 'AMT'] },
@@ -48,7 +49,21 @@ const vehicleSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
   availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
-}, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
+}, {
+  timestamps: true,
+  toJSON: {
+    virtuals: true,
+    transform: (doc, ret) => {
+      delete ret.__v;
+      const v = ret.video || ret.videoUrl || (Array.isArray(ret.videos) && ret.videos[0]) || '';
+      ret.video = v;
+      ret.videoUrl = v;
+      ret.videos = Array.isArray(ret.videos) && ret.videos.length > 0 ? ret.videos : (v ? [v] : []);
+      return ret;
+    },
+  },
+  toObject: { virtuals: true },
+});
 
 vehicleSchema.index({ brand: 1, model: 1 });
 vehicleSchema.index({ city: 1, status: 1 });
@@ -62,6 +77,14 @@ vehicleSchema.index({
 }, { weights: { brand: 10, model: 10, title: 8, location: 5, description: 1 }, name: 'vehicle_search' });
 
 vehicleSchema.pre('save', function (next) {
+  // Sync video, videoUrl, and videos
+  const v = this.video || this.videoUrl || (Array.isArray(this.videos) && this.videos[0]) || '';
+  if (v) {
+    if (!this.video) this.video = v;
+    if (!this.videoUrl) this.videoUrl = v;
+    if (!Array.isArray(this.videos) || this.videos.length === 0) this.videos = [v];
+  }
+
   if (!this.make && this.brand) this.make = this.brand;
   if (!this.brand && this.make) this.brand = this.make;
   if (!this.wheelerType) this.wheelerType = this.category;
