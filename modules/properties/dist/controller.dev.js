@@ -26,7 +26,7 @@ var asyncHandler = require('../../utils/asyncHandler');
 
 var propertyService = require('./propertyService');
 
-var NUMERIC_FIELDS = ['bedrooms', 'balconies', 'floors', 'totalFloors', 'areaSize', 'projectCount', 'totalUnits', 'availableUnits'];
+var NUMERIC_FIELDS = ['bedrooms', 'balconies', 'totalFloors', 'areaSize', 'projectCount', 'totalUnits', 'availableUnits'];
 
 function extractNumber(val) {
   if (val == null || val === '') return undefined;
@@ -86,12 +86,30 @@ var base = createCRUDController({
     }
   },
   transformCreateData: function transformCreateData(req, data) {
-    return sanitizeNumericFields(_objectSpread({}, data, {
+    var sanitized = sanitizeNumericFields(_objectSpread({}, data, {
       subtitle: data.subtitle || data.title
     }));
+    if (sanitized.rawPrice && !sanitized.numericPrice) sanitized.numericPrice = sanitized.rawPrice;
+
+    if (typeof sanitized.amenities === 'string') {
+      sanitized.amenities = sanitized.amenities.split(',').map(function (a) {
+        return a.trim();
+      }).filter(Boolean);
+    }
+
+    return sanitized;
   },
   transformUpdateData: function transformUpdateData(req, data) {
-    return sanitizeNumericFields(data);
+    var sanitized = sanitizeNumericFields(data);
+    if (sanitized.rawPrice && !sanitized.numericPrice) sanitized.numericPrice = sanitized.rawPrice;
+
+    if (typeof sanitized.amenities === 'string') {
+      sanitized.amenities = sanitized.amenities.split(',').map(function (a) {
+        return a.trim();
+      }).filter(Boolean);
+    }
+
+    return sanitized;
   }
 });
 var getAll = asyncHandler(function _callee(req, res) {
