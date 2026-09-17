@@ -24,6 +24,9 @@ const defaultOrigins = [
   'http://localhost:5174',
   'http://localhost:5175',
   'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
   'https://onevishwam.com',
   'https://www.onevishwam.com',
   'https://admin.onevishwam.com',
@@ -35,22 +38,36 @@ const envOrigins = process.env.CORS_ORIGIN
 
 const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, curl, Postman, server-to-server)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
-        return callback(null, true);
-      }
-      return callback(
-        new Error('The CORS policy for this site does not allow access from the specified Origin.'),
-        false
-      );
-    },
-    credentials: true,
-  })
-);
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return true;
+  if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true;
+  if (/^https:\/\/([a-zA-Z0-9-]+\.)*onevishwam\.com$/.test(origin)) return true;
+  if (/^https:\/\/([a-zA-Z0-9-]+\.)*web\.app$/.test(origin)) return true;
+  if (/^https:\/\/([a-zA-Z0-9-]+\.)*firebaseapp\.com$/.test(origin)) return true;
+  return false;
+};
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (isAllowedOrigin(origin) || process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    return callback(
+      new Error('The CORS policy for this site does not allow access from the specified Origin.'),
+      false
+    );
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Set-Cookie'],
+  maxAge: 86400,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));

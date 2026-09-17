@@ -34,7 +34,6 @@ exports.api = onRequest(
     maxInstances: 3,
     timeoutSeconds: 120,
     secrets: ["MONGODB_URI"],
-    cors: true,
   },
   app
 );
