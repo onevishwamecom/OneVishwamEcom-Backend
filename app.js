@@ -12,12 +12,6 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-// Response compression (reduces egress bandwidth and function execution time)
-app.use(compression());
-
-// Security headers
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-
 // CORS configuration
 const defaultOrigins = [
   'http://localhost:5173',
@@ -48,6 +42,33 @@ const isAllowedOrigin = (origin) => {
   if (/^https:\/\/([a-zA-Z0-9-]+\.)*firebaseapp\.com$/.test(origin)) return true;
   return false;
 };
+
+// Immediate top-level CORS and preflight handling (ensures Access-Control-Allow-Credentials is always set)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (isAllowedOrigin(origin) || process.env.NODE_ENV === 'development')) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      req.headers['access-control-request-headers'] ||
+        'Content-Type, Authorization, X-Requested-With, Accept, Origin'
+    );
+    res.setHeader('Access-Control-Expose-Headers', 'Set-Cookie');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
+
+// Response compression (reduces egress bandwidth and function execution time)
+app.use(compression());
+
+// Security headers
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
 const corsOptions = {
   origin: function (origin, callback) {
