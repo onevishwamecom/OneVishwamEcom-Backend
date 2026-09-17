@@ -18,13 +18,16 @@
 const Busboy = require('busboy');
 const { Readable } = require('stream');
 const { getStorage } = require('firebase-admin/storage');
+const crypto = require('crypto');
 const path = require('path');
 const ApiError = require('../utils/ApiError');
+
+const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getBucket() {
-  return getStorage().bucket();
+  return getStorage().bucket(BUCKET_NAME);
 }
 
 /** Generate a unique filename preserving the original extension */
@@ -45,13 +48,18 @@ function uniqueFilename(originalname) {
 async function uploadBuffer(buffer, storagePath, mimeType) {
   const bucket = getBucket();
   const file = bucket.file(storagePath);
+  const token = crypto.randomUUID();
   await file.save(buffer, {
-    metadata: { contentType: mimeType },
+    metadata: {
+      contentType: mimeType,
+      metadata: {
+        firebaseStorageDownloadTokens: token,
+      },
+    },
     resumable: false,   // small files — disable resumable for speed
-    public: true,       // make the file publicly readable
   });
-  // Permanent public URL (no expiry — works because file is public)
-  return `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+  // Firebase Storage permanent download URL
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${token}`;
 }
 
 // ─── Multipart Parser ─────────────────────────────────────────────────────────
