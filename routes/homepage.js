@@ -5,11 +5,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const modules = require('../modules');
 const Property = require('../modules/properties/model');
 const Vehicle = require('../modules/vehicles/model');
-const Grocery = require('../modules/groceries/model');
-const Garment = require('../modules/garments/model');
-const Jewellery = require('../modules/jewellery/model');
-const Finance = require('../modules/finance/model');
-const FinanceOffering = require('../modules/financeOfferings/model');
+// Groceries, Garments, Jewellery, Finance, FinanceOfferings are disabled —
+// only Properties and Vehicles are active.
 
 const router = express.Router();
 
@@ -55,20 +52,6 @@ const CARD_PROJECTION = {
   banner: 1,
 };
 
-const FINANCE_OFFERING_PROJECTION = {
-  title: 1,
-  subtitle: 1,
-  type: 1,
-  interestRate: 1,
-  minAmount: 1,
-  maxAmount: 1,
-  icon: 1,
-  badge: 1,
-  badgeColor: 1,
-  order: 1,
-  status: 1,
-  availabilityStatus: 1,
-};
 
 // GET /api/homepage — single endpoint returning all homepage sections
 router.get('/', optionalAuth, asyncHandler(async (req, res) => {
@@ -76,11 +59,6 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     featuredProperties,
     latestProperties,
     latestVehicles,
-    latestGroceries,
-    latestGarments,
-    latestJewellery,
-    latestFinance,
-    financeOfferings,
   ] = await Promise.all([
     // Featured properties (top 6)
     Property.find({ featured: true, status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
@@ -102,76 +80,31 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
       .limit(8)
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
-
-    // Latest groceries (top 8)
-    Grocery.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
-      .sort({ createdAt: -1 })
-      .limit(8)
-      .select(CARD_PROJECTION)
-      .lean().catch(() => []),
-
-    // Latest garments (top 8)
-    Garment.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
-      .sort({ createdAt: -1 })
-      .limit(8)
-      .select(CARD_PROJECTION)
-      .lean().catch(() => []),
-
-    // Latest jewellery (top 8)
-    Jewellery.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
-      .sort({ createdAt: -1 })
-      .limit(8)
-      .select(CARD_PROJECTION)
-      .lean().catch(() => []),
-
-    // Latest finance services (top 6)
-    Finance.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
-      .sort({ createdAt: -1 })
-      .limit(6)
-      .select(CARD_PROJECTION)
-      .lean().catch(() => []),
-
-    // Finance offerings / loan cards (top 6)
-    FinanceOffering.find({ status: 'active', availabilityStatus: { $ne: 'sold_out' } })
-      .sort({ order: 1, createdAt: -1 })
-      .limit(6)
-      .select(FINANCE_OFFERING_PROJECTION)
-      .lean().catch(() => []),
   ]);
 
-  // Stats
-  const [
-    totalProperties,
-    totalVehicles,
-    totalGroceries,
-    totalGarments,
-    totalJewellery,
-    totalFinance,
-  ] = await Promise.all([
+  // Stats — only active categories
+  const [totalProperties, totalVehicles] = await Promise.all([
     Property.countDocuments({ status: { $in: ['approved', 'active'] } }),
     Vehicle.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
-    Grocery.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
-    Garment.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
-    Jewellery.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
-    Finance.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
   ]);
 
   const data = {
     featured: featuredProperties,
     latestProperties,
     latestVehicles,
-    latestGroceries,
-    latestGarments,
-    latestJewellery,
-    latestFinance,
-    financeOfferings,
+    // Disabled categories — return empty arrays to keep response shape stable
+    latestGroceries: [],
+    latestGarments: [],
+    latestJewellery: [],
+    latestFinance: [],
+    financeOfferings: [],
     stats: {
       totalProperties,
       totalVehicles,
-      totalGroceries,
-      totalGarments,
-      totalJewellery,
-      totalFinance,
+      totalGroceries: 0,
+      totalGarments: 0,
+      totalJewellery: 0,
+      totalFinance: 0,
     },
   };
 
