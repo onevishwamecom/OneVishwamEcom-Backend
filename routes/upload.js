@@ -9,8 +9,8 @@ const ApiError = require('../utils/ApiError');
 
 const router = express.Router();
 
-// POST /upload/images — product images (up to 10)
-router.post('/images', protect, upload.array('images', 10), (req, res) => {
+// POST /upload/images — product images (up to 5, max 1MB each)
+router.post('/images', protect, upload.array('images', 5), (req, res) => {
   if (!req.uploadedFiles || req.uploadedFiles.length === 0) {
     throw new ApiError(400, 'No images provided');
   }
@@ -18,12 +18,12 @@ router.post('/images', protect, upload.array('images', 10), (req, res) => {
   new ApiResponse(200, { images: urls }, 'Images uploaded').send(res);
 });
 
-// POST /upload/video — single product video
+// POST /upload/video — single product video (max 10MB)
 router.post('/video', protect, upload.uploadVideo.single('video'), (req, res) => {
   if (!req.uploadedFile) {
     throw new ApiError(400, 'No video provided');
   }
-  new ApiResponse(200, { videos: [req.uploadedFile.url] }, 'Video uploaded').send(res);
+  new ApiResponse(200, { videoUrl: req.uploadedFile.url, videos: [req.uploadedFile.url] }, 'Video uploaded').send(res);
 });
 
 // POST /upload/media — images + optional video together
