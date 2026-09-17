@@ -27,12 +27,12 @@ setGlobalOptions({
 exports.api = onRequest(
   {
     region: "asia-south1",
-    memory: "512MiB",
+    memory: "1GiB",
     cpu: 1,
     concurrency: 80,
     minInstances: 0,
     maxInstances: 3,
-    timeoutSeconds: 60,
+    timeoutSeconds: 120,
     secrets: ["MONGODB_URI"],
     cors: true,
   },
