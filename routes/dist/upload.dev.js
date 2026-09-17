@@ -92,7 +92,7 @@ router.post('/media', protect, function _callee3(req, res, next) {
             });
           });
           bb.on('finish', function _callee2() {
-            var bucket, uploaded;
+            var crypto, BUCKET_NAME, bucket, uploaded;
             return regeneratorRuntime.async(function _callee2$(_context2) {
               while (1) {
                 switch (_context2.prev = _context2.next) {
@@ -114,10 +114,12 @@ router.post('/media', protect, function _callee3(req, res, next) {
 
                   case 4:
                     _context2.prev = 4;
-                    bucket = getStorage().bucket();
-                    _context2.next = 8;
+                    crypto = require('crypto');
+                    BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
+                    bucket = getStorage().bucket(BUCKET_NAME);
+                    _context2.next = 10;
                     return regeneratorRuntime.awrap(Promise.all(parsed.map(function _callee(f) {
-                      var isVideo, folder, ext, fname, storagePath;
+                      var isVideo, folder, ext, fname, storagePath, token;
                       return regeneratorRuntime.async(function _callee$(_context) {
                         while (1) {
                           switch (_context.prev = _context.next) {
@@ -127,22 +129,25 @@ router.post('/media', protect, function _callee3(req, res, next) {
                               ext = path.extname(f.originalname).toLowerCase() || (isVideo ? '.mp4' : '.jpg');
                               fname = "".concat(Date.now(), "-").concat(Math.floor(Math.random() * 1e9)).concat(ext);
                               storagePath = "".concat(folder, "/").concat(fname);
-                              _context.next = 7;
+                              token = crypto.randomUUID();
+                              _context.next = 8;
                               return regeneratorRuntime.awrap(bucket.file(storagePath).save(f.buffer, {
                                 metadata: {
-                                  contentType: f.mimetype
+                                  contentType: f.mimetype,
+                                  metadata: {
+                                    firebaseStorageDownloadTokens: token
+                                  }
                                 },
-                                resumable: false,
-                                "public": true
+                                resumable: false
                               }));
 
-                            case 7:
+                            case 8:
                               return _context.abrupt("return", {
-                                url: "https://storage.googleapis.com/".concat(bucket.name, "/").concat(storagePath),
+                                url: "https://firebasestorage.googleapis.com/v0/b/".concat(bucket.name, "/o/").concat(encodeURIComponent(storagePath), "?alt=media&token=").concat(token),
                                 isVideo: isVideo
                               });
 
-                            case 8:
+                            case 9:
                             case "end":
                               return _context.stop();
                           }
@@ -150,7 +155,7 @@ router.post('/media', protect, function _callee3(req, res, next) {
                       });
                     })));
 
-                  case 8:
+                  case 10:
                     uploaded = _context2.sent;
                     new ApiResponse(200, {
                       images: uploaded.filter(function (u) {
@@ -164,20 +169,20 @@ router.post('/media', protect, function _callee3(req, res, next) {
                         return u.url;
                       })
                     }, 'Media uploaded').send(res);
-                    _context2.next = 15;
+                    _context2.next = 17;
                     break;
 
-                  case 12:
-                    _context2.prev = 12;
+                  case 14:
+                    _context2.prev = 14;
                     _context2.t0 = _context2["catch"](4);
                     next(_context2.t0);
 
-                  case 15:
+                  case 17:
                   case "end":
                     return _context2.stop();
                 }
               }
-            }, null, null, [[4, 12]]);
+            }, null, null, [[4, 14]]);
           });
           bb.on('error', function (err) {
             return next(new ApiError(400, "Parse error: ".concat(err.message)));
