@@ -28,7 +28,7 @@ exports.api = onRequest(
   {
     region: "asia-south1",
     memory: "512MiB",
-    cpu: 0.5,
+    cpu: 1,
     concurrency: 80,
     minInstances: 0,
     maxInstances: 3,
