@@ -57,6 +57,7 @@ const propertySchema = new mongoose.Schema({
   amenities: { type: [String], default: [] },
   images: { type: [String], default: [] },
   video: { type: String, default: '', trim: true },
+  videoUrl: { type: String, default: '', trim: true },
   videos: { type: [String], default: [] },
   floorPlanImages: { type: [String], default: [] },
   pdfUrl: { type: String, default: '' },
@@ -110,8 +111,10 @@ const propertySchema = new mongoose.Schema({
       ret.floorPlanPdf = ret.pdfUrl || ret.brochure || '';
       ret.pdf = ret.pdfUrl || ret.brochure || '';
       ret.images = Array.isArray(ret.images) ? ret.images.filter(Boolean) : [];
-      ret.video = ret.video || (Array.isArray(ret.videos) && ret.videos[0]) || '';
-      ret.videos = Array.isArray(ret.videos) && ret.videos.length > 0 ? ret.videos : (ret.video ? [ret.video] : []);
+      const v = ret.video || ret.videoUrl || (Array.isArray(ret.videos) && ret.videos[0]) || '';
+      ret.video = v;
+      ret.videoUrl = v;
+      ret.videos = Array.isArray(ret.videos) && ret.videos.length > 0 ? ret.videos : (v ? [v] : []);
       return ret;
     },
   },
@@ -130,6 +133,14 @@ propertySchema.index({
 }, { weights: { title: 10, subtitle: 5, description: 1, location: 3, area: 3, city: 5 }, name: 'property_search' });
 
 propertySchema.pre('save', function (next) {
+  // Sync video, videoUrl, and videos
+  const v = this.video || this.videoUrl || (Array.isArray(this.videos) && this.videos[0]) || '';
+  if (v) {
+    if (!this.video) this.video = v;
+    if (!this.videoUrl) this.videoUrl = v;
+    if (!Array.isArray(this.videos) || this.videos.length === 0) this.videos = [v];
+  }
+
   // Sync numericPrice and rawPrice
   if (this.rawPrice && !this.numericPrice) {
     this.numericPrice = this.rawPrice;
