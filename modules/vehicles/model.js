@@ -33,6 +33,8 @@ const vehicleSchema = new mongoose.Schema({
   featured: { type: Boolean, default: false, index: true },
   variants: { type: Number, default: 1 },
   images: { type: [String], default: [] },
+  video: { type: String, default: '', trim: true },
+  videos: { type: [String], default: [] },
   description: { type: String, maxlength: 5000 },
   transmission: { type: String, enum: ['Manual', 'Automatic', 'CVT', 'DCT', 'AMT'] },
   mileage: { type: String, trim: true },

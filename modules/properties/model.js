@@ -56,6 +56,8 @@ const propertySchema = new mongoose.Schema({
   powerBackup: { type: Boolean, default: false },
   amenities: { type: [String], default: [] },
   images: { type: [String], default: [] },
+  video: { type: String, default: '', trim: true },
+  videos: { type: [String], default: [] },
   floorPlanImages: { type: [String], default: [] },
   pdfUrl: { type: String, default: '' },
   brochure: { type: String, default: '' },
@@ -108,6 +110,8 @@ const propertySchema = new mongoose.Schema({
       ret.floorPlanPdf = ret.pdfUrl || ret.brochure || '';
       ret.pdf = ret.pdfUrl || ret.brochure || '';
       ret.images = Array.isArray(ret.images) ? ret.images.filter(Boolean) : [];
+      ret.video = ret.video || (Array.isArray(ret.videos) && ret.videos[0]) || '';
+      ret.videos = Array.isArray(ret.videos) && ret.videos.length > 0 ? ret.videos : (ret.video ? [ret.video] : []);
       return ret;
     },
   },
