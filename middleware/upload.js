@@ -1,70 +1,21 @@
-const multer = require('multer');
-const path = require('path');
-const ApiError = require('../utils/ApiError');
+/**
+ * Image upload middleware — Firebase Storage
+ * Replaces Cloudinary + multer-storage-cloudinary.
+ * Files stored under: products/images/
+ */
+const { makeImageUploadMiddleware, makeVideoUploadMiddleware } = require('./firebaseStorage');
 
-let storage;
-
-if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
-  const { CloudinaryStorage } = require('multer-storage-cloudinary');
-  const cloudinary = require('cloudinary').v2;
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-  storage = new CloudinaryStorage({
-    cloudinary,
-    params: {
-      folder: 'onevishwam/uploads',
-      allowed_formats: ['jpeg', 'jpg', 'png', 'gif', 'webp', 'avif'],
-      transformation: [{ width: 1200, height: 900, crop: 'limit', quality: 'auto' }],
-    },
-  });
-} else {
-  storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, process.env.UPLOAD_PATH || 'uploads');
-    },
-    filename: (req, file, cb) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      cb(null, uniqueSuffix + path.extname(file.originalname));
-    },
-  });
-}
-
-const imageFileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif|webp|avif/;
-  const extname = allowed.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowed.test(file.mimetype);
-  if (extname && mimetype) {
-    cb(null, true);
-  } else {
-    cb(new ApiError(400, 'Only image files are allowed (JPEG, PNG, WebP, GIF, AVIF)'), false);
-  }
+// upload.array('images', 10) equivalent — attaches req.uploadedFiles
+const upload = {
+  array: (fieldname, maxCount = 10) => makeImageUploadMiddleware('products/images', maxCount, 5),
+  single: (fieldname) => makeImageUploadMiddleware('products/images', 1, 5),
 };
 
-const videoFileFilter = (req, file, cb) => {
-  const allowed = /mp4|webm|mov|avi/;
-  const extname = allowed.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowed.test(file.mimetype);
-  if (extname && mimetype) {
-    cb(null, true);
-  } else {
-    cb(new ApiError(400, 'Only video files are allowed (MP4, WebM, MOV, AVI)'), false);
-  }
+// Video upload — attaches req.uploadedFile
+const uploadVideo = {
+  single: (fieldname) => makeVideoUploadMiddleware('products/videos', 50),
+  fields: (fields) => makeVideoUploadMiddleware('products/videos', 50), // simplified for /media route
 };
-
-const upload = multer({
-  storage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024 },
-});
-
-const uploadVideo = multer({
-  storage,
-  fileFilter: videoFileFilter,
-  limits: { fileSize: parseInt(process.env.MAX_VIDEO_SIZE) || 10 * 1024 * 1024 },
-});
 
 module.exports = upload;
 module.exports.uploadVideo = uploadVideo;
