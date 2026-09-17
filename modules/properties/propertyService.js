@@ -16,7 +16,7 @@ const SORT_OPTIONS = {
 };
 
 function buildFilter(query) {
-  const filter = { status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out'] } };
+  const filter = { status: { $in: ['approved', 'active', 'available'] }, availabilityStatus: { $in: ['available', 'sold_out', null] } };
   const reserved = ['q', 'page', 'limit', 'sort', 'sortBy', 'search', 'priceMin', 'priceMax', 'areaMin', 'areaMax', 'listedWithin'];
 
   for (const [key, value] of Object.entries(query)) {
@@ -52,8 +52,8 @@ function buildFilter(query) {
 
 function buildSearchQuery(q) {
   return {
-    status: { $in: ['approved', 'active'] },
-    availabilityStatus: { $in: ['available', 'sold_out'] },
+    status: { $in: ['approved', 'active', 'available'] },
+    availabilityStatus: { $in: ['available', 'sold_out', null] },
     $or: [
       { title: { $regex: q, $options: 'i' } },
       { description: { $regex: q, $options: 'i' } },

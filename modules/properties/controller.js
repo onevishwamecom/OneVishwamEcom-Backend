@@ -5,7 +5,7 @@ const ApiError = require('../../utils/ApiError');
 const asyncHandler = require('../../utils/asyncHandler');
 const propertyService = require('./propertyService');
 
-const NUMERIC_FIELDS = ['bedrooms', 'balconies', 'floors', 'totalFloors', 'areaSize', 'projectCount', 'totalUnits', 'availableUnits'];
+const NUMERIC_FIELDS = ['bedrooms', 'balconies', 'totalFloors', 'areaSize', 'projectCount', 'totalUnits', 'availableUnits'];
 
 function extractNumber(val) {
   if (val == null || val === '') return undefined;
@@ -32,8 +32,22 @@ const base = createCRUDController({
     numericPrice: { min: 'priceMin', max: 'priceMax' },
     numericArea: { min: 'areaMin', max: 'areaMax' },
   },
-  transformCreateData: (req, data) => sanitizeNumericFields({ ...data, subtitle: data.subtitle || data.title }),
-  transformUpdateData: (req, data) => sanitizeNumericFields(data),
+  transformCreateData: (req, data) => {
+    const sanitized = sanitizeNumericFields({ ...data, subtitle: data.subtitle || data.title });
+    if (sanitized.rawPrice && !sanitized.numericPrice) sanitized.numericPrice = sanitized.rawPrice;
+    if (typeof sanitized.amenities === 'string') {
+      sanitized.amenities = sanitized.amenities.split(',').map((a) => a.trim()).filter(Boolean);
+    }
+    return sanitized;
+  },
+  transformUpdateData: (req, data) => {
+    const sanitized = sanitizeNumericFields(data);
+    if (sanitized.rawPrice && !sanitized.numericPrice) sanitized.numericPrice = sanitized.rawPrice;
+    if (typeof sanitized.amenities === 'string') {
+      sanitized.amenities = sanitized.amenities.split(',').map((a) => a.trim()).filter(Boolean);
+    }
+    return sanitized;
+  },
 });
 
 const getAll = asyncHandler(async (req, res) => {

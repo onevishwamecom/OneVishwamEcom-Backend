@@ -10,6 +10,8 @@ const propertySchema = new mongoose.Schema({
   purpose: { type: String, enum: ['Sell', 'Rent', 'Lease'], index: true },
   price: { type: String, trim: true },
   numericPrice: { type: Number, default: 0, index: true },
+  propertyType: { type: String, trim: true, index: true },
+  rawPrice: { type: Number, index: true },
   priceType: { type: String, default: 'fixed', trim: true },
   priceSuffix: { type: String, default: '', trim: true },
   negotiable: { type: Boolean, default: false },
@@ -17,7 +19,14 @@ const propertySchema = new mongoose.Schema({
   state: { type: String, trim: true },
   city: { type: String, lowercase: true, trim: true, index: true },
   area: { type: String, trim: true, index: true },
-  pincode: { type: String, trim: true, match: [/^\d{6}$/, 'Pincode must be 6 digits'] },
+  pincode: {
+    type: String,
+    trim: true,
+    validate: {
+      validator: (v) => !v || /^\d{6}$/.test(String(v).trim()),
+      message: 'Pincode must be 6 digits',
+    },
+  },
   landmark: { type: String, trim: true },
   latitude: { type: Number },
   longitude: { type: Number },
@@ -30,9 +39,14 @@ const propertySchema = new mongoose.Schema({
   bathrooms: { type: String, trim: true },
   balconies: { type: Number },
   bhk: { type: String, trim: true },
-  floors: { type: Number },
+  floors: { type: String, trim: true },
   totalFloors: { type: Number },
   floor: { type: String, trim: true },
+  towers: { type: String, trim: true },
+  approval: { type: String, trim: true },
+  possession: { type: String, trim: true },
+  details: { type: String, trim: true, maxlength: 5000 },
+  vendorName: { type: String, trim: true },
   facing: { type: String, default: '', trim: true },
   furnishing: { type: String, trim: true },
   furnishingStatus: { type: String, trim: true },
@@ -47,6 +61,7 @@ const propertySchema = new mongoose.Schema({
   brochure: { type: String, default: '' },
   contact: { type: String, trim: true },
   contactEmail: { type: String, trim: true },
+  email: { type: String, trim: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   agent: {
     name: { type: String, trim: true },
@@ -77,17 +92,22 @@ const propertySchema = new mongoose.Schema({
     virtuals: true,
     transform: (doc, ret) => {
       delete ret.__v;
-      // Preserve original subcategory value; add normalized version for UI if needed
-      const rawSub = String(ret.subcategory || ret.subCategory || ret.category || '').toLowerCase();
-      let normalizedSubcategory = 'Flat';
-      if (rawSub.includes('plot') || rawSub.includes('site') || rawSub.includes('land')) {
-        normalizedSubcategory = 'Plot';
-      } else if (rawSub.includes('villa')) {
-        normalizedSubcategory = 'Villa';
-      }
+      // Dual-compatibility cross-mappings
+      ret.details = ret.details || ret.description || '';
+      ret.description = ret.description || ret.details || '';
+      ret.possession = ret.possession || ret.possessionStatus || '';
+      ret.possessionStatus = ret.possessionStatus || ret.possession || '';
+      ret.propertyType = ret.propertyType || ret.subcategory || ret.subCategory || '';
+      ret.subcategory = ret.subcategory || ret.propertyType || '';
+      ret.email = ret.email || ret.contactEmail || '';
+      ret.contactEmail = ret.contactEmail || ret.email || '';
+      ret.rawPrice = ret.rawPrice || ret.numericPrice || 0;
+      ret.vendorName = ret.vendorName || ret.agent?.name || ret.postedBy || '';
+
       ret.floorPlans = ret.floorPlanImages || [];
-      ret.floorPlanPdf = ret.pdfUrl || '';
-      ret.pdf = ret.pdfUrl || '';
+      ret.floorPlanPdf = ret.pdfUrl || ret.brochure || '';
+      ret.pdf = ret.pdfUrl || ret.brochure || '';
+      ret.images = Array.isArray(ret.images) ? ret.images.filter(Boolean) : [];
       return ret;
     },
   },
@@ -106,20 +126,48 @@ propertySchema.index({
 }, { weights: { title: 10, subtitle: 5, description: 1, location: 3, area: 3, city: 5 }, name: 'property_search' });
 
 propertySchema.pre('save', function (next) {
-  if (!this.numericPrice && this.price) {
+  // Sync numericPrice and rawPrice
+  if (this.rawPrice && !this.numericPrice) {
+    this.numericPrice = this.rawPrice;
+  } else if (!this.numericPrice && this.price) {
     this.numericPrice = parsePrice(this.price);
   }
+  if (this.numericPrice && !this.rawPrice) {
+    this.rawPrice = this.numericPrice;
+  }
+
   if (!this.numericArea && this.area) {
     this.numericArea = parseArea(this.area);
   }
 
-  // Store normalized subcategory for UI filtering; keep original subcategory intact
-  const rawSub = String(this.subcategory || this.subCategory || this.category || '').toLowerCase();
-  let normalizedSubcategory = 'Flat';
-  if (rawSub.includes('plot') || rawSub.includes('site') || rawSub.includes('land')) {
-    normalizedSubcategory = 'Plot';
-  } else if (rawSub.includes('villa')) {
-    normalizedSubcategory = 'Villa';
+  // Cross-populate alias fields
+  if (this.details && !this.description) {
+    this.description = this.details;
+  } else if (this.description && !this.details) {
+    this.details = this.description;
+  }
+
+  if (this.possession && !this.possessionStatus) {
+    this.possessionStatus = this.possession;
+  } else if (this.possessionStatus && !this.possession) {
+    this.possession = this.possessionStatus;
+  }
+
+  if (this.propertyType && !this.subcategory) {
+    this.subcategory = this.propertyType;
+  } else if (this.subcategory && !this.propertyType) {
+    this.propertyType = this.subcategory;
+  }
+
+  if (this.email && !this.contactEmail) {
+    this.contactEmail = this.email;
+  } else if (this.contactEmail && !this.email) {
+    this.email = this.contactEmail;
+  }
+
+  // Normalize images array
+  if (Array.isArray(this.images)) {
+    this.images = this.images.filter((img) => img && typeof img === 'string' && img.trim() !== '');
   }
 
   next();

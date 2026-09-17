@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const path = require('path');
+const admin = require('firebase-admin');
 const connectDB = require('./config/db');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
@@ -54,6 +55,13 @@ app.use(
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Firebase Admin SDK — initialise once (no-op if already done by index.js)
+if (!admin.apps.length) {
+  admin.initializeApp({
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app',
+  });
+}
 
 // Request logging (development / non-production)
 if (process.env.NODE_ENV !== 'production') {
