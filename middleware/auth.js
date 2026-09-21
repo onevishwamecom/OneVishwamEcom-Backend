@@ -5,6 +5,7 @@ const Lister = require('../models/Lister');
 const Admin = require('../models/Admin');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
+const { resolvePartnerIdentity } = require('../config/partnerDirectory');
 
 function resolveAccountType(decoded) {
   if (decoded.accountType === 'user' || decoded.accountType === 'lister' || decoded.accountType === 'admin') {
@@ -26,6 +27,24 @@ function extractBearerToken(req) {
     return req.headers.authorization.split(' ')[1];
   }
   return null;
+}
+
+function attachPartnerIdentity(req, email) {
+  if (!email) return;
+  const partnerInfo = resolvePartnerIdentity(email);
+  if (partnerInfo && partnerInfo.isLocked) {
+    if (req.user) {
+      req.user.partnerName = partnerInfo.partnerName;
+      req.user.partnerRole = partnerInfo.role;
+      req.user.role = partnerInfo.role || req.user.role;
+      req.user.origin = partnerInfo.origin;
+    }
+    if (req.auth) {
+      req.auth.partnerName = partnerInfo.partnerName;
+      req.auth.partnerRole = partnerInfo.role;
+      req.auth.origin = partnerInfo.origin;
+    }
+  }
 }
 
 /**
@@ -74,6 +93,7 @@ const verifyFirebaseToken = asyncHandler(async (req, res, next) => {
         role: adminAccount.role || 'super-admin',
       };
       req.firebaseClaims = decodedToken;
+      attachPartnerIdentity(req, email || adminAccount.email);
       return next();
     }
 
@@ -98,6 +118,7 @@ const verifyFirebaseToken = asyncHandler(async (req, res, next) => {
         listerId: listerAccount.listerId || null,
       };
       req.firebaseClaims = decodedToken;
+      attachPartnerIdentity(req, email || listerAccount.email);
       return next();
     }
 
@@ -135,6 +156,7 @@ const verifyFirebaseToken = asyncHandler(async (req, res, next) => {
       listerId: user.listerId || null,
     };
     req.firebaseClaims = decodedToken;
+    attachPartnerIdentity(req, email || user.email);
     return next();
   } catch (firebaseError) {
     // 2. Fallback: Check if it is a valid legacy JWT (used by Lister / Admin portals)
@@ -156,6 +178,7 @@ const verifyFirebaseToken = asyncHandler(async (req, res, next) => {
       };
       req.user = doc;
       req.user.role = req.auth.role;
+      attachPartnerIdentity(req, doc.email);
       return next();
     } catch (jwtError) {
       console.error('Auth Verification Error:', firebaseError.message);

@@ -94,6 +94,20 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     data.lister = req.auth.id;
   }
 
+  // Enforce server-side Channel Partner identity & in-house tagging
+  if (req.user?.partnerName || req.auth?.partnerName) {
+    data.channelPartnerName = req.user?.partnerName || req.auth?.partnerName;
+    if (data.details && typeof data.details === 'object') {
+      data.details.channelPartnerName = data.channelPartnerName;
+    }
+  }
+  if (req.user?.origin || req.auth?.origin) {
+    data.origin = req.user?.origin || req.auth?.origin;
+  } else if (req.user?.role === 'in_house' || req.auth?.role === 'in_house') {
+    data.origin = 'in_house_project';
+    data.channelPartnerName = 'One Vishwam';
+  }
+
   const item = await mod.model.create(data);
   new ApiResponse(201, { item: normalizeListingItem(item) }, 'Listing created successfully. It is pending admin approval.').send(res);
 }));

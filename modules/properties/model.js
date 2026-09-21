@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { parsePrice } = require('../../utils/priceUtils');
+const Property = require('../../models/Property');
 
 const propertySchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 200 },
@@ -45,8 +46,11 @@ const propertySchema = new mongoose.Schema({
   towers: { type: String, trim: true },
   approval: { type: String, trim: true },
   possession: { type: String, trim: true },
-  details: { type: String, trim: true, maxlength: 5000 },
+  details: { type: mongoose.Schema.Types.Mixed, default: {} },
   vendorName: { type: String, trim: true },
+  channelPartnerName: { type: String, trim: true },
+  origin: { type: String, trim: true, default: '' },
+  bankLoanDetails: { type: String, trim: true },
   facing: { type: String, default: '', trim: true },
   furnishing: { type: String, trim: true },
   furnishingStatus: { type: String, trim: true },
@@ -96,8 +100,11 @@ const propertySchema = new mongoose.Schema({
     transform: (doc, ret) => {
       delete ret.__v;
       // Dual-compatibility cross-mappings
-      ret.details = ret.details || ret.description || '';
-      ret.description = ret.description || ret.details || '';
+      ret.details = ret.details || {};
+      ret.description = ret.description || (typeof ret.details === 'string' ? ret.details : (ret.details.description || ''));
+      ret.channelPartnerName = ret.channelPartnerName || (ret.details && ret.details.channelPartnerName) || '';
+      ret.bankLoanDetails = ret.bankLoanDetails || (ret.details && ret.details.bankLoanDetails) || '';
+      ret.loanApproved = Boolean(ret.loanApproved || (ret.bankLoanDetails && !ret.bankLoanDetails.toLowerCase().includes('no')));
       ret.possession = ret.possession || ret.possessionStatus || '';
       ret.possessionStatus = ret.possessionStatus || ret.possession || '';
       ret.propertyType = ret.propertyType || ret.subcategory || ret.subCategory || '';
@@ -125,6 +132,8 @@ propertySchema.index({ city: 1, area: 1 });
 propertySchema.index({ subcategory: 1, status: 1 });
 propertySchema.index({ category: 1, status: 1 });
 propertySchema.index({ purpose: 1, status: 1 });
+propertySchema.index({ propertyType: 1, status: 1 });
+propertySchema.index({ approval: 1, status: 1 });
 propertySchema.index({ createdAt: -1 });
 propertySchema.index({ viewsCount: -1 });
 propertySchema.index({ featured: 1, status: 1 });
@@ -133,6 +142,47 @@ propertySchema.index({
 }, { weights: { title: 10, subtitle: 5, description: 1, location: 3, area: 3, city: 5 }, name: 'property_search' });
 
 propertySchema.pre('save', function (next) {
+  // Synchronize from details subdocument if provided
+  if (this.details && typeof this.details === 'object') {
+    const d = this.details;
+    if (!this.title && (d.propertyName || d.projectName)) {
+      this.title = d.propertyName || d.projectName;
+    }
+    if (!this.facing && (d.facing || d.plotFacing)) {
+      this.facing = d.facing || d.plotFacing;
+    }
+    if (!this.bhk && d.bhk) {
+      this.bhk = d.bhk;
+    }
+    if (!this.floors && (d.floors || d.totalFloors)) {
+      this.floors = d.floors || d.totalFloors;
+    }
+    if (!this.furnishing && d.furnishing) {
+      this.furnishing = d.furnishing;
+    }
+    if (!this.possession && d.possession) {
+      this.possession = d.possession;
+    }
+    if (!this.parking && (d.parking || d.parkingCapacity)) {
+      this.parking = d.parking || d.parkingCapacity;
+    }
+    if (!this.approval && (d.approvalAuthority || d.approvalZone)) {
+      this.approval = d.approvalAuthority || d.approvalZone;
+    }
+    if (!this.bankLoanDetails && d.bankLoanDetails) {
+      this.bankLoanDetails = d.bankLoanDetails;
+    }
+    if (d.gatedCommunity !== undefined) {
+      this.gatedCommunity = d.gatedCommunity === 'Yes';
+    }
+    if (d.negotiable !== undefined) {
+      this.negotiable = d.negotiable === 'Yes';
+    }
+    if (this.bankLoanDetails) {
+      this.loanApproved = !this.bankLoanDetails.toLowerCase().includes('no');
+    }
+  }
+
   // Sync video, videoUrl, and videos
   const v = this.video || this.videoUrl || (Array.isArray(this.videos) && this.videos[0]) || '';
   if (v) {
@@ -156,10 +206,8 @@ propertySchema.pre('save', function (next) {
   }
 
   // Cross-populate alias fields
-  if (this.details && !this.description) {
+  if (this.details && !this.description && typeof this.details === 'string') {
     this.description = this.details;
-  } else if (this.description && !this.details) {
-    this.details = this.description;
   }
 
   if (this.possession && !this.possessionStatus) {
@@ -198,3 +246,4 @@ function parseArea(s) {
 propertySchema.statics.parsePrice = parsePrice;
 
 module.exports = mongoose.model('Property', propertySchema);
+module.exports = Property;

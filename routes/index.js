@@ -14,6 +14,7 @@ const homepageRoutes = require('./homepage');
 const wishlistRoutes = require('../modules/wishlist/routes');
 const requirementRoutes = require('../modules/requirements/routes');
 const propertyRoutes = require('../modules/properties/routes');
+const propertyRoutes = require('./propertyRoutes');
 const propertyRequirementRoutes = require('./propertyRequirements');
 const financeOfferingsRoutes = require('../modules/financeOfferings/routes');
 
@@ -23,6 +24,8 @@ router.use('/v1/auth', authRoutes);
 router.use('/v1/users', userRoutes);
 router.use('/v1/properties', propertyRoutes);
 modules.forEach(mod => router.use(`/${mod.id}`, mod.routes));
+router.use('/properties', propertyRoutes);
+modules.filter(mod => mod.id !== 'properties').forEach(mod => router.use(`/${mod.id}`, mod.routes));
 router.use('/v1/property-requirements', propertyRequirementRoutes);
 router.use('/auth', authRoutes);
 router.use('/auth/lister', listerRoutes);
