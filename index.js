@@ -33,7 +33,6 @@ exports.api = onRequest(
     minInstances: 0,
     maxInstances: 3,
     timeoutSeconds: 120,
-    secrets: ["MONGODB_URI"],
   },
   app
 );
