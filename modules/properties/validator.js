@@ -2,6 +2,7 @@ const { body } = require('express-validator');
 
 const createRules = [
   body('title').trim().notEmpty().withMessage('Title is required').isLength({ max: 200 }),
+  body('title').optional().trim().isLength({ max: 200 }),
   body('pincode').optional({ values: 'falsy' }).matches(/^\d{6}$/).withMessage('Pincode must be 6 digits'),
   body('projectCount').optional().isInt({ min: 0 }).toInt(),
   body('totalUnits').optional().isInt({ min: 0 }).toInt(),

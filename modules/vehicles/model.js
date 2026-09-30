@@ -98,4 +98,4 @@ vehicleSchema.pre('save', function (next) {
   next();
 });
 
-module.exports = mongoose.model('Vehicle', vehicleSchema);
+module.exports = mongoose.models.Vehicle || mongoose.model('Vehicle', vehicleSchema);
