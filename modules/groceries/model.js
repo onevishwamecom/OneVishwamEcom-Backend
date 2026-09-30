@@ -37,4 +37,4 @@ grocerySchema.pre('save', function (next) {
   next();
 });
 
-module.exports = mongoose.model('Grocery', grocerySchema);
+module.exports = mongoose.models.Grocery || mongoose.model('Grocery', grocerySchema);

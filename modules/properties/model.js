@@ -243,7 +243,4 @@ function parseArea(s) {
   return parseFloat(m[1].replace(/,/g, '')) || 0;
 }
 
-propertySchema.statics.parsePrice = parsePrice;
-
-module.exports = mongoose.model('Property', propertySchema);
 module.exports = Property;

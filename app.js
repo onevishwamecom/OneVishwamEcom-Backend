@@ -120,8 +120,9 @@ app.use((req, res, next) => {
 // Static uploads serving (served directly before DB connection check)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Ensure MongoDB connection only for functional API requests (reused and safe for serverless Cloud Functions)
-// Preflight OPTIONS, health endpoints, static assets, and favicon bypass DB connections to save compute/sockets.
+const mongoose = require('mongoose');
+
+// Ensure MongoDB connection for functional API requests (reused connection pool)
 app.use(async (req, res, next) => {
   if (
     req.method === 'OPTIONS' ||
@@ -130,6 +131,9 @@ app.use(async (req, res, next) => {
     req.path.startsWith('/uploads') ||
     req.path === '/favicon.ico'
   ) {
+    return next();
+  }
+  if (mongoose.connection.readyState === 1) {
     return next();
   }
   try {
