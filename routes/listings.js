@@ -55,20 +55,31 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   const flatten = req.query.flatten === '1';
   const grouped = {};
   const flat = [];
-  const isAdmin = req.auth.role === 'admin' || req.auth.accountType === 'admin';
+  const isAdmin = req.auth?.role === 'admin' || req.auth?.accountType === 'admin';
+  const userEmail = req.auth?.email || req.user?.email || '';
+
+  const mongoose = require('mongoose');
+  const isValidObjectId = (val) => val && mongoose.Types.ObjectId.isValid(String(val));
+
+  const filterOr = [];
+  if (isValidObjectId(req.auth?.id)) filterOr.push({ lister: req.auth.id }, { user: req.auth.id });
+  if (isValidObjectId(req.user?._id)) filterOr.push({ lister: req.user._id }, { user: req.user._id });
+  if (userEmail) filterOr.push({ 'contributor.email': userEmail });
 
   for (const mod of modules) {
-    // Filter by lister or user ID; if admin, retrieve all listings
-    const filter = isAdmin
-      ? {}
-      : { $or: [{ lister: req.auth.id }, { user: req.auth.id }] };
+    try {
+      if (!mod || !mod.model) continue;
+      const filter = isAdmin ? {} : (filterOr.length > 0 ? { $or: filterOr } : {});
 
-    const items = await mod.model.find(filter).sort({ createdAt: -1 }).limit(500).lean();
-    if (!items || items.length === 0) continue;
-    const normalizedItems = items.map(normalizeListingItem);
-    grouped[mod.id] = normalizedItems;
-    for (const item of normalizedItems) {
-      flat.push({ ...item, _type: mod.id });
+      const items = await mod.model.find(filter).sort({ createdAt: -1 }).limit(500).lean();
+      if (!items || items.length === 0) continue;
+      const normalizedItems = items.map(normalizeListingItem);
+      grouped[mod.id] = normalizedItems;
+      for (const item of normalizedItems) {
+        flat.push({ ...item, _type: mod.id });
+      }
+    } catch (modErr) {
+      console.warn(`⚠️ [GET /api/listings] Error querying module ${mod?.id}:`, modErr.message);
     }
   }
 
@@ -129,14 +140,18 @@ router.post('/', protect, asyncHandler(async (req, res) => {
 }));
 
 function isOwnerOrAdmin(item, req) {
-  if (req.auth.role === 'admin') return;
-  // Check lister ownership for lister accounts
-  if (req.auth.accountType === 'lister') {
-    if (item && item.lister && item.lister.toString() === req.auth.id.toString()) return;
+  if (req.auth?.role === 'admin' || req.auth?.accountType === 'admin') return;
+  const authId = req.auth?.id ? String(req.auth.id) : null;
+  const userId = req.user?._id ? String(req.user._id) : null;
+  const userEmail = req.auth?.email || req.user?.email || '';
+
+  if (item) {
+    if (authId && item.lister && String(item.lister) === authId) return;
+    if (authId && item.user && String(item.user) === authId) return;
+    if (userId && item.lister && String(item.lister) === userId) return;
+    if (userId && item.user && String(item.user) === userId) return;
+    if (userEmail && item.contributor && item.contributor.email === userEmail) return;
   }
-  // Fallback to user ownership for backward compatibility
-  if (item && item.user && item.user.toString() === req.auth.id.toString()) return;
-  if (item && item.lister && item.lister.toString() === req.auth.id.toString()) return;
   throw new ApiError(403, 'Not authorized to access this listing');
 }
 
