@@ -369,24 +369,71 @@ const deleteListing = asyncHandler(async (req, res) => {
 // ─── Contributors ───────────────────────────────────────────────────────────
 
 const getContributors = asyncHandler(async (req, res) => {
-  const listers = await Lister.find({}, 'name email phone listerId city area pincode createdAt').lean();
+  let listers = [];
+  try {
+    listers = (await Lister.find({}, 'name email phone listerId city area pincode createdAt').lean()) || [];
+  } catch (err) {
+    console.warn('⚠️ [ADMIN CONTRIBUTORS]: Lister collection query failed:', err.message);
+    listers = [];
+  }
 
-  const enriched = await Promise.all(listers.map(async (lister) => {
+  const listingContributorsMap = new Map();
+  await Promise.all(modules.map(async (mod) => {
+    try {
+      if (!mod || !mod.model) return;
+      const items = await mod.model.find({}, 'contributor lister user vendorName channelPartnerName status createdAt').lean();
+      (items || []).forEach((item) => {
+        if (item.contributor && (item.contributor.name || item.contributor.email)) {
+          const key = item.contributor.email || String(item.lister || item.user || item._id);
+          if (!listingContributorsMap.has(key)) {
+            listingContributorsMap.set(key, {
+              _id: item.lister || item.user || item._id,
+              name: item.contributor.name || item.channelPartnerName || item.vendorName || 'Contributor',
+              email: item.contributor.email || '',
+              phone: item.contributor.contact || '',
+              city: item.contributor.city || '',
+              type: item.contributor.type || 'lister',
+              createdAt: item.createdAt || new Date(),
+            });
+          }
+        }
+      });
+    } catch {}
+  }));
+
+  const map = new Map();
+  listers.forEach((l) => map.set(String(l._id || l.email), l));
+  listingContributorsMap.forEach((c, key) => {
+    if (!map.has(key)) map.set(key, c);
+  });
+
+  const allContributors = Array.from(map.values());
+
+  const enriched = await Promise.all(allContributors.map(async (lister) => {
     let totalListings = 0;
     let pendingCount = 0;
     let approvedCount = 0;
 
     await Promise.all(modules.map(async (mod) => {
       try {
+        if (!mod || !mod.model) return;
+        const filterOr = [
+          lister._id ? { lister: lister._id } : null,
+          lister._id ? { user: lister._id } : null,
+          lister.email ? { 'contributor.email': lister.email } : null,
+        ].filter(Boolean);
+
+        if (filterOr.length === 0) return;
+
         const [total, pending, approved] = await Promise.all([
-          mod.model.countDocuments({ lister: lister._id }),
-          mod.model.countDocuments({ lister: lister._id, status: 'pending' }),
-          mod.model.countDocuments({ lister: lister._id, status: 'approved' }),
+          mod.model.countDocuments({ $or: filterOr }),
+          mod.model.countDocuments({ status: 'pending', $or: filterOr }),
+          mod.model.countDocuments({ status: 'approved', $or: filterOr }),
         ]);
-        totalListings += total;
-        pendingCount += pending;
-        approvedCount += approved;
-      } catch { }
+        totalListings += total || 0;
+        pendingCount += pending || 0;
+        approvedCount += approved || 0;
+      } catch {}
     }));
 
     return {
@@ -402,21 +449,34 @@ const getContributors = asyncHandler(async (req, res) => {
 
 const getContributorById = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const lister = await Lister.findById(id).lean();
-  if (!lister) throw new ApiError(404, 'Contributor not found');
+  let lister = null;
+  try {
+    lister = await Lister.findById(id).lean();
+  } catch {}
 
   const listings = {};
   let totalListings = 0;
 
   await Promise.all(modules.map(async (mod) => {
     try {
-      const items = await mod.model.find({ lister: id }).sort({ createdAt: -1 }).lean();
-      if (items.length > 0) {
+      if (!mod || !mod.model) return;
+      const items = await mod.model.find({ $or: [{ lister: id }, { user: id }] }).sort({ createdAt: -1 }).lean();
+      if (items && items.length > 0) {
         listings[mod.id] = items;
         totalListings += items.length;
       }
-    } catch { }
+    } catch {}
   }));
+
+  if (!lister) {
+    // Construct synthetic contributor profile from listing data if not in Lister model
+    lister = {
+      _id: id,
+      name: 'Contributor',
+      email: '',
+      phone: '',
+    };
+  }
 
   new ApiResponse(200, { contributor: lister, listings, totalListings }, 'Contributor details fetched').send(res);
 });
