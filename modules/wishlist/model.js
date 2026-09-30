@@ -9,4 +9,4 @@ const wishlistSchema = new mongoose.Schema({
 wishlistSchema.index({ user: 1, item: 1, serviceType: 1 }, { unique: true });
 wishlistSchema.index({ user: 1, createdAt: -1 });
 
-module.exports = mongoose.model('Wishlist', wishlistSchema);
+module.exports = mongoose.models.Wishlist || mongoose.model('Wishlist', wishlistSchema);

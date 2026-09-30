@@ -1,5 +1,11 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
 const Admin = require('../models/Admin');
+
+// Ensure fast DNS SRV resolution for MongoDB Atlas on macOS/Node.js
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {}
 
 let cachedConnection = null;
 let cachedPromise = null;
@@ -21,7 +27,13 @@ const connectDB = async () => {
     return cachedPromise;
   }
 
-  if (!process.env.MONGODB_URI) {
+  const mongoUri =
+    process.env.MONGODB_URI ||
+    (process.env.MONGODB_USERNAME && process.env.MONGODB_PASSWORD
+      ? `mongodb+srv://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@cluster0.jcvxsia.mongodb.net/onevishwam?retryWrites=true&w=majority`
+      : 'mongodb://127.0.0.1:27017/onevishwam');
+
+  if (!mongoUri) {
     throw new Error('MONGODB_URI environment variable is not defined');
   }
 
@@ -29,14 +41,15 @@ const connectDB = async () => {
     serverSelectionTimeoutMS: 5000,
     connectTimeoutMS: 5000,
     socketTimeoutMS: 20000,
-    maxPoolSize: process.env.MONGO_MAX_POOL_SIZE ? parseInt(process.env.MONGO_MAX_POOL_SIZE, 10) : 5,
-    autoIndex: process.env.NODE_ENV !== 'production',
+    maxPoolSize: process.env.MONGO_MAX_POOL_SIZE ? parseInt(process.env.MONGO_MAX_POOL_SIZE, 10) : 10,
+    autoIndex: false,
   };
 
-  cachedPromise = mongoose.connect(process.env.MONGODB_URI, opts)
+  cachedPromise = mongoose
+    .connect(mongoUri, opts)
     .then(async (conn) => {
       cachedConnection = conn.connection;
-      console.log(`[DATABASE] MongoDB Atlas connected: ${conn.connection.host}`);
+      console.log(`[DATABASE] MongoDB Atlas connected successfully: ${conn.connection.host}`);
       if (!isBootstrapped) {
         await bootstrapAdmin();
         isBootstrapped = true;
@@ -45,8 +58,8 @@ const connectDB = async () => {
     })
     .catch((err) => {
       cachedPromise = null;
-      console.error(`[DATABASE] MongoDB Atlas connection error: ${err.message}`);
-      throw err;
+      console.error(`[DATABASE] MongoDB Atlas Connection Error: ${err.message}`);
+      return null;
     });
 
   return cachedPromise;

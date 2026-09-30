@@ -16,11 +16,15 @@ const CATEGORY_TO_MODULE = {
   jewellery: 'jewellery',
   finance: 'finance',
   service: 'properties',
+  bedding: 'garments',
+  electronics: 'garments',
 };
 
 function findModule(type) {
-  const mod = modules.find((m) => m.id === type);
-  if (!mod) throw new ApiError(400, `Unknown listing type "${type}"`);
+  let mod = modules.find((m) => m.id === type);
+  if (!mod) {
+    mod = modules.find((m) => m.id === 'properties') || modules[0];
+  }
   return mod;
 }
 
@@ -51,15 +55,16 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   const flatten = req.query.flatten === '1';
   const grouped = {};
   const flat = [];
+  const isAdmin = req.auth.role === 'admin' || req.auth.accountType === 'admin';
 
   for (const mod of modules) {
-    // Filter by lister if authenticated as lister, otherwise by user
-    const filter = req.auth.accountType === 'lister'
-      ? { lister: req.auth.id }
-      : { user: req.auth.id };
+    // Filter by lister or user ID; if admin, retrieve all listings
+    const filter = isAdmin
+      ? {}
+      : { $or: [{ lister: req.auth.id }, { user: req.auth.id }] };
 
     const items = await mod.model.find(filter).sort({ createdAt: -1 }).limit(500).lean();
-    if (items.length === 0) continue;
+    if (!items || items.length === 0) continue;
     const normalizedItems = items.map(normalizeListingItem);
     grouped[mod.id] = normalizedItems;
     for (const item of normalizedItems) {
@@ -75,7 +80,7 @@ router.get('/', protect, asyncHandler(async (req, res) => {
 
 // POST /api/listings  — create a listing owned by the authenticated account.
 router.post('/', protect, asyncHandler(async (req, res) => {
-  const type = req.body._type || CATEGORY_TO_MODULE[req.body.category] || null;
+  const type = req.body._type || CATEGORY_TO_MODULE[req.body.category] || req.body.category || 'properties';
   const mod = findModule(type);
 
   const body = { ...req.body };
@@ -87,11 +92,36 @@ router.post('/', protect, asyncHandler(async (req, res) => {
   delete body.status; // Backend controls status - always PENDING on creation
 
   const data = { ...body, status: 'pending' };
-  if (req.auth.accountType === 'lister') {
-    data.lister = req.auth.id;
+
+  const mongoose = require('mongoose');
+  const isValidObjectId = (val) => val && mongoose.Types.ObjectId.isValid(String(val));
+  const ownerId = isValidObjectId(req.auth?.id)
+    ? req.auth.id
+    : (isValidObjectId(req.user?._id) ? req.user._id : new mongoose.Types.ObjectId());
+
+  data.user = ownerId;
+  data.lister = ownerId;
+  data.createdBy = ownerId;
+
+  // Server-side automatic identity resolution for One Vishwam vs External Listers
+  const userEmail = (req.user?.email || req.auth?.email || '').toLowerCase();
+  const isOneVishwamUser = userEmail.endsWith('@onevishwam.com') || req.user?.role === 'in_house' || req.auth?.role === 'in_house';
+
+  if (isOneVishwamUser) {
+    data.channelPartnerName = 'One Vishwam';
+    data.vendorName = 'One Vishwam';
+    data.origin = 'in_house_project';
   } else {
-    data.user = req.auth.id;
-    data.lister = req.auth.id;
+    data.channelPartnerName = data.channelPartnerName || req.user?.partnerName || req.auth?.partnerName || req.user?.fullName || req.user?.name || req.auth?.name || 'External Partner';
+    data.vendorName = data.vendorName || req.user?.fullName || req.user?.name || req.auth?.name || req.user?.partnerName || req.auth?.partnerName || 'Independent Owner';
+    data.origin = req.user?.origin || req.auth?.origin || 'channel_partner_project';
+  }
+
+  data.bankLoanDetails = data.bankLoanDetails || 'Available on request';
+
+  if (data.details && typeof data.details === 'object') {
+    data.details.channelPartnerName = data.channelPartnerName;
+    data.details.vendorName = data.vendorName;
   }
 
   const item = await mod.model.create(data);

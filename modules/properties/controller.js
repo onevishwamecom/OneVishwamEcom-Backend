@@ -38,6 +38,19 @@ const base = createCRUDController({
     if (typeof sanitized.amenities === 'string') {
       sanitized.amenities = sanitized.amenities.split(',').map((a) => a.trim()).filter(Boolean);
     }
+    // Server-side enforcement of Channel Partner identity & in-house tagging
+    if (req.user?.partnerName || req.auth?.partnerName) {
+      sanitized.channelPartnerName = req.user?.partnerName || req.auth?.partnerName;
+      if (sanitized.details && typeof sanitized.details === 'object') {
+        sanitized.details.channelPartnerName = sanitized.channelPartnerName;
+      }
+    }
+    if (req.user?.origin || req.auth?.origin) {
+      sanitized.origin = req.user?.origin || req.auth?.origin;
+    } else if (req.user?.role === 'in_house' || req.auth?.role === 'in_house') {
+      sanitized.origin = 'in_house_project';
+      sanitized.channelPartnerName = 'One Vishwam';
+    }
     return sanitized;
   },
   transformUpdateData: (req, data) => {
