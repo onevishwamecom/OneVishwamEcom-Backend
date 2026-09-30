@@ -29,9 +29,7 @@ const connectDB = async () => {
 
   const mongoUri =
     process.env.MONGODB_URI ||
-    (process.env.MONGODB_USERNAME && process.env.MONGODB_PASSWORD
-      ? `mongodb+srv://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@cluster0.jcvxsia.mongodb.net/onevishwam?retryWrites=true&w=majority`
-      : 'mongodb://127.0.0.1:27017/onevishwam');
+    'mongodb+srv://onevishwamecom_db_user:VishwamPass123@onevishwam.372aojy.mongodb.net/onevishwam?retryWrites=true&w=majority';
 
   if (!mongoUri) {
     throw new Error('MONGODB_URI environment variable is not defined');
