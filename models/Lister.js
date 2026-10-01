@@ -13,12 +13,22 @@ const listerSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    firebaseUid: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     name: {
       type: String,
       required: [true, 'Name is required'],
       trim: true,
       minlength: [2, 'Name must be at least 2 characters'],
       maxlength: [50, 'Name cannot exceed 50 characters'],
+    },
+    fullName: {
+      type: String,
+      trim: true,
     },
     email: {
       type: String,
@@ -31,19 +41,22 @@ const listerSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: [true, 'Phone number is required'],
       unique: true,
+      sparse: true,
       trim: true,
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
       minlength: [8, 'Password must be at least 8 characters'],
       select: false,
     },
     phoneVerified: {
       type: Boolean,
       default: false,
+    },
+    role: {
+      type: String,
+      default: 'lister',
     },
     status: {
       type: String,

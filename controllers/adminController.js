@@ -155,8 +155,29 @@ const getAllListings = asyncHandler(async (req, res) => {
       if (items.length > 0) {
         results[mod.id] = items.map((item) => {
           const v = item.video || item.videoUrl || (Array.isArray(item.videos) && item.videos[0]) || '';
+          let listerObj = item.lister;
+          if (!listerObj || typeof listerObj !== 'object') {
+            const fallbackName = item.contributor?.name || item.channelPartnerName || item.vendorName || 'Contributor';
+            const fallbackEmail = item.contributor?.email || item.contactEmail || item.email || '';
+            const fallbackPhone = item.contributor?.contact || item.contributor?.phone || item.contact || item.phone || '';
+            listerObj = {
+              _id: item.lister || item.user || item._id,
+              name: fallbackName,
+              email: fallbackEmail,
+              phone: fallbackPhone,
+            };
+          }
+          const contributorObj = item.contributor || {
+            _id: listerObj._id,
+            name: listerObj.name,
+            email: listerObj.email,
+            contact: listerObj.phone,
+            phone: listerObj.phone,
+          };
           return {
             ...item,
+            lister: listerObj,
+            contributor: contributorObj,
             video: v,
             videoUrl: v,
             videos: Array.isArray(item.videos) && item.videos.length > 0 ? item.videos : (v ? [v] : []),
@@ -208,6 +229,33 @@ const getListingDetail = asyncHandler(async (req, res) => {
   const mod = findModule(type);
   const item = await mod.model.findById(id).populate('lister', 'name email phone listerId city area pincode').lean();
   if (!item) throw new ApiError(404, 'Listing not found');
+
+  if (!item.lister || typeof item.lister !== 'object') {
+    const fallbackName = item.contributor?.name || item.channelPartnerName || item.vendorName || 'Contributor';
+    const fallbackEmail = item.contributor?.email || item.contactEmail || item.email || '';
+    const fallbackPhone = item.contributor?.contact || item.contributor?.phone || item.contact || item.phone || '';
+    const fallbackCity = item.contributor?.city || item.city || '';
+
+    item.lister = {
+      _id: item.lister || item.user || item._id,
+      name: fallbackName,
+      email: fallbackEmail,
+      phone: fallbackPhone,
+      city: fallbackCity,
+    };
+  }
+
+  if (!item.contributor) {
+    item.contributor = {
+      _id: item.lister?._id || item.lister || item.user || item._id,
+      name: item.lister?.name || item.channelPartnerName || item.vendorName || 'Contributor',
+      email: item.lister?.email || item.contactEmail || '',
+      contact: item.lister?.phone || item.contact || '',
+      phone: item.lister?.phone || item.contact || '',
+      city: item.lister?.city || item.city || '',
+    };
+  }
+
   new ApiResponse(200, { item }, 'Listing fetched').send(res);
 });
 
@@ -289,10 +337,6 @@ const approveListing = asyncHandler(async (req, res) => {
   const item = await mod.model.findById(id);
   if (!item) throw new ApiError(404, 'Listing not found');
 
-  if (!['pending', 'changes-required'].includes(item.status)) {
-    throw new ApiError(400, `Cannot approve listing with status "${item.status}"`);
-  }
-
   item.status = 'approved';
   item.adminComment = undefined;
   item.updatedAt = new Date();
@@ -307,10 +351,6 @@ const requestChanges = asyncHandler(async (req, res) => {
   const mod = findModule(type);
   const item = await mod.model.findById(id);
   if (!item) throw new ApiError(404, 'Listing not found');
-
-  if (!['pending'].includes(item.status)) {
-    throw new ApiError(400, `Cannot request changes for listing with status "${item.status}"`);
-  }
 
   item.status = 'changes-required';
   item.adminComment = reason || 'Please make the required changes and resubmit.';
