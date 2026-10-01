@@ -30,11 +30,11 @@ function findModule(type) {
 
 // Status constants
 const LISTER_ALLOWED_STATUSES = ['pending', 'changes-required'];
-const LISTER_EDITABLE_STATUSES = ['pending', 'changes-required', 'approved'];
+const LISTER_EDITABLE_STATUSES = ['pending', 'changes-required', 'approved', 'cancelled', 'rejected'];
 const ADMIN_STATUS_TRANSITIONS = {
-  approve: { from: ['pending', 'changes-required'], to: 'approved' },
-  changes: { from: ['pending'], to: 'changes-required' },
-  cancel: { from: ['pending', 'changes-required', 'approved'], to: 'cancelled' },
+  approve: { from: ['pending', 'changes-required', 'approved', 'active', 'cancelled', 'rejected'], to: 'approved' },
+  changes: { from: ['pending', 'changes-required', 'approved', 'active', 'cancelled', 'rejected'], to: 'changes-required' },
+  cancel: { from: ['pending', 'changes-required', 'approved', 'active', 'cancelled', 'rejected'], to: 'cancelled' },
 };
 
 function normalizeListingItem(item) {
@@ -130,6 +130,31 @@ router.post('/', protect, asyncHandler(async (req, res) => {
 
   data.bankLoanDetails = data.bankLoanDetails || 'Available on request';
 
+  const contributorName =
+    req.user?.fullName ||
+    req.user?.name ||
+    req.auth?.name ||
+    body.contributor?.name ||
+    data.vendorName ||
+    data.channelPartnerName ||
+    (userEmail ? userEmail.split('@')[0] : '') ||
+    'Contributor';
+
+  const contributorPhone = req.user?.phone || req.user?.phoneNumber || req.user?.mobile || body.contributor?.contact || body.contact || '';
+  const contributorCity = req.user?.city || body.contributor?.city || body.city || '';
+
+  data.contributor = {
+    _id: ownerId,
+    id: ownerId,
+    name: contributorName,
+    email: userEmail || body.contactEmail || '',
+    contact: contributorPhone,
+    phone: contributorPhone,
+    city: contributorCity,
+    type: req.auth?.accountType || 'lister',
+    createdAt: new Date(),
+  };
+
   if (data.details && typeof data.details === 'object') {
     data.details.channelPartnerName = data.channelPartnerName;
     data.details.vendorName = data.vendorName;
@@ -193,10 +218,11 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   }
 
   const wasApproved = item.status === 'approved';
+  const wasCancelled = item.status === 'cancelled' || item.status === 'rejected';
   Object.assign(item, body);
 
-  // If user/lister edits a changes-required or approved listing, it goes back to pending
-  if (req.auth.role !== 'admin' && (item.status === 'changes-required' || wasApproved)) {
+  // If user/lister edits a changes-required, cancelled, or approved listing, it goes back to pending for re-approval
+  if (req.auth.role !== 'admin' && (item.status === 'changes-required' || wasCancelled || wasApproved)) {
     item.status = 'pending';
     // Clear any previous admin comment when resubmitting
     item.adminComment = undefined;
@@ -303,12 +329,8 @@ router.patch('/admin/:type/:id/approve', protect, adminOnly, asyncHandler(async 
   const item = await mod.model.findById(req.params.id);
   if (!item) throw new ApiError(404, 'Listing not found');
 
-  const transition = ADMIN_STATUS_TRANSITIONS.approve;
-  if (!transition.from.includes(item.status)) {
-    throw new ApiError(400, `Cannot approve listing with status "${item.status}"`);
-  }
-
-  item.status = transition.to;
+  item.status = 'approved';
+  item.adminComment = undefined;
   item.updatedAt = new Date();
   await item.save();
 
@@ -321,13 +343,8 @@ router.patch('/admin/:type/:id/changes', protect, adminOnly, asyncHandler(async 
   const item = await mod.model.findById(req.params.id);
   if (!item) throw new ApiError(404, 'Listing not found');
 
-  const transition = ADMIN_STATUS_TRANSITIONS.changes;
-  if (!transition.from.includes(item.status)) {
-    throw new ApiError(400, `Cannot request changes for listing with status "${item.status}"`);
-  }
-
   const reason = req.body.reason || 'Please make the required changes and resubmit.';
-  item.status = transition.to;
+  item.status = 'changes-required';
   item.adminComment = reason;
   item.updatedAt = new Date();
   await item.save();

@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const validate = require('../middleware/validate');
 const { protect, verifyFirebaseToken } = require('../middleware/auth');
 const User = require('../models/User');
+const Lister = require('../models/Lister');
 const ApiResponse = require('../utils/ApiResponse');
 const {
   registerRules,
@@ -72,6 +73,60 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
     }
 
     const phone = phoneNumber || mobile;
+    const isLister = role === 'lister' || req.auth?.accountType === 'lister' || req.user?.role === 'lister';
+
+    if (isLister) {
+      const cleanEmail = email ? email.toLowerCase().trim() : undefined;
+      const cleanPhone = phone ? phone.trim() : undefined;
+      const displayName = (fullName || req.user?.name || req.user?.fullName || (cleanEmail ? cleanEmail.split('@')[0] : 'Lister')).trim();
+
+      let lister = await Lister.findOne({
+        $or: [
+          { firebaseUid: uid },
+          ...(cleanEmail ? [{ email: cleanEmail }] : []),
+        ],
+      });
+
+      if (lister) {
+        lister.firebaseUid = uid;
+        if (cleanEmail) lister.email = cleanEmail;
+        if (displayName) {
+          lister.name = displayName;
+          lister.fullName = displayName;
+        }
+        if (cleanPhone) lister.phone = cleanPhone;
+        if (city) lister.city = city;
+        if (area) lister.area = area;
+        if (pincode) lister.pincode = pincode;
+        lister.status = 'ACTIVE';
+        if (!lister.listerId) {
+          lister.listerId = cleanPhone || uid;
+        }
+        await lister.save({ validateBeforeSave: false });
+      } else {
+        lister = await Lister.create({
+          listerId: cleanPhone || uid,
+          firebaseUid: uid,
+          name: displayName,
+          fullName: displayName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          city: city || '',
+          area: area || '',
+          pincode: pincode || '',
+          status: 'ACTIVE',
+          role: 'lister',
+        });
+      }
+
+      console.log(`[Auth Sync] Successfully saved LISTER ${cleanEmail || uid} (${uid}) to MongoDB Atlas (listers collection).`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Lister saved to MongoDB Atlas (listers collection) successfully',
+        data: lister.toListerJSON ? lister.toListerJSON() : lister,
+      });
+    }
 
     const updateFields = {
       firebaseUid: uid,
@@ -113,18 +168,33 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
 // Fetch full profile on page reload from MongoDB Atlas
 router.get('/me', verifyFirebaseToken, async (req, res) => {
   try {
-    let user = req.user;
-    if (req.firebaseClaims?.uid && !user) {
-      user = await User.findOne({ firebaseUid: req.firebaseClaims.uid });
+    let account = req.user;
+    const uid = req.firebaseClaims?.uid || req.user?.firebaseUid;
+    const email = (req.firebaseClaims?.email || req.user?.email || '').toLowerCase();
+
+    if (uid && (!account || !account._id)) {
+      account = (await Lister.findOne({ firebaseUid: uid })) ||
+                (await User.findOne({ firebaseUid: uid }));
     }
 
-    if (!user) {
+    if (!account && email) {
+      account = (await Lister.findOne({ email })) ||
+                (await User.findOne({ email }));
+    }
+
+    if (!account) {
       return res.status(404).json({ success: false, message: 'User not found in MongoDB' });
     }
 
+    const responseData = account.toListerJSON
+      ? account.toListerJSON()
+      : account.toProfileJSON
+      ? account.toProfileJSON()
+      : account;
+
     return res.status(200).json({
       success: true,
-      data: user.toProfileJSON ? user.toProfileJSON() : user,
+      data: responseData,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
