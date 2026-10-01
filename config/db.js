@@ -27,18 +27,20 @@ const connectDB = async () => {
     return cachedPromise;
   }
 
-  const mongoUri =
-    process.env.MONGODB_URI ||
+  const activeClusterUri =
     'mongodb+srv://onevishwamecom_db_user:VishwamPass123@onevishwam.372aojy.mongodb.net/onevishwam?retryWrites=true&w=majority';
 
-  if (!mongoUri) {
-    throw new Error('MONGODB_URI environment variable is not defined');
+  let mongoUri = process.env.ATLAS_MONGODB_URI || process.env.MONGODB_URI || activeClusterUri;
+
+  // Sanitize against legacy/outdated environment variables in Cloud Functions
+  if (!mongoUri.includes('372aojy.mongodb.net') || !mongoUri.includes('VishwamPass123')) {
+    mongoUri = activeClusterUri;
   }
 
   const opts = {
-    serverSelectionTimeoutMS: 5000,
-    connectTimeoutMS: 5000,
-    socketTimeoutMS: 20000,
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 15000,
+    socketTimeoutMS: 30000,
     maxPoolSize: process.env.MONGO_MAX_POOL_SIZE ? parseInt(process.env.MONGO_MAX_POOL_SIZE, 10) : 10,
     autoIndex: false,
   };
@@ -57,7 +59,7 @@ const connectDB = async () => {
     .catch((err) => {
       cachedPromise = null;
       console.error(`[DATABASE] MongoDB Atlas Connection Error: ${err.message}`);
-      return null;
+      throw err;
     });
 
   return cachedPromise;

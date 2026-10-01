@@ -8,6 +8,9 @@ const app = require("./app");
 const connectDB = require("./config/db");
 const User = require("./models/User");
 
+// Eagerly initiate DB connection on serverless container startup
+connectDB().catch((err) => console.warn("⚠️ [WARMUP] Eager DB connection warning:", err.message));
+
 // Global options for 2nd Gen Firebase Functions
 setGlobalOptions({
   region: "asia-south1",
