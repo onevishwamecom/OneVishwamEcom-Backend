@@ -28,6 +28,7 @@ const propertySchema = new mongoose.Schema({
       message: 'Pincode must be 6 digits',
     },
   },
+  address: { type: String, trim: true },
   landmark: { type: String, trim: true },
   latitude: { type: Number },
   longitude: { type: Number },
@@ -177,6 +178,12 @@ propertySchema.pre('save', function (next) {
     }
     if (d.negotiable !== undefined) {
       this.negotiable = d.negotiable === 'Yes';
+    }
+    if (!this.address && d.address) {
+      this.address = d.address;
+    }
+    if (!this.landmark && d.landmark) {
+      this.landmark = d.landmark;
     }
     if (this.bankLoanDetails) {
       this.loanApproved = !this.bankLoanDetails.toLowerCase().includes('no');
