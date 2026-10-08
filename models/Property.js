@@ -259,6 +259,8 @@ const propertySchema = new mongoose.Schema(
     city: { type: String, lowercase: true, trim: true, default: 'bengaluru', index: true },
     area: { type: String, trim: true, default: '', index: true },
     pincode: { type: String, trim: true, default: '' },
+    address: { type: String, trim: true, default: '' },
+    landmark: { type: String, trim: true, default: '' },
     location: { type: String, trim: true, default: '' },
     contact: { type: String, trim: true, default: '' },
     contactEmail: { type: String, trim: true, default: '' },
@@ -389,6 +391,13 @@ propertySchema.pre('save', function (next) {
   // Loan approval flag
   if (this.bankLoanDetails) {
     this.loanApproved = !this.bankLoanDetails.toLowerCase().includes('no');
+  }
+
+  if (!this.address && d.address) {
+    this.address = d.address;
+  }
+  if (!this.landmark && d.landmark) {
+    this.landmark = d.landmark;
   }
 
   // Sync video and brochure aliases

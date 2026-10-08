@@ -73,12 +73,30 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
     }
 
     const phone = phoneNumber || mobile;
-    const isLister = role === 'lister' || req.auth?.accountType === 'lister' || req.user?.role === 'lister';
+    const cleanEmail = email ? email.toLowerCase().trim() : undefined;
+    const cleanPhone = phone ? phone.trim() : undefined;
+
+    // Check if account already exists as a Lister in MongoDB Atlas
+    const existingLister = uid || cleanEmail ? await Lister.findOne({
+      $or: [
+        ...(uid ? [{ firebaseUid: uid }] : []),
+        ...(cleanEmail ? [{ email: cleanEmail }] : []),
+      ],
+    }) : null;
+
+    const isLister = role === 'lister' || Boolean(existingLister) || req.auth?.accountType === 'lister' || req.user?.role === 'lister';
 
     if (isLister) {
-      const cleanEmail = email ? email.toLowerCase().trim() : undefined;
-      const cleanPhone = phone ? phone.trim() : undefined;
-      const displayName = (fullName || req.user?.name || req.user?.fullName || (cleanEmail ? cleanEmail.split('@')[0] : 'Lister')).trim();
+      const bodyName = (fullName || req.body.name)?.trim();
+      const displayName = bodyName || req.user?.name || req.user?.fullName || (cleanEmail ? cleanEmail.split('@')[0] : 'Lister');
+
+      // Clean up any accidental duplicate in User collection (users)
+      if (uid || cleanEmail) {
+        const deleteConditions = [];
+        if (uid) deleteConditions.push({ firebaseUid: uid });
+        if (cleanEmail) deleteConditions.push({ email: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+        await User.deleteMany({ $or: deleteConditions }).catch(() => null);
+      }
 
       let lister = await Lister.findOne({
         $or: [
@@ -90,7 +108,10 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       if (lister) {
         lister.firebaseUid = uid;
         if (cleanEmail) lister.email = cleanEmail;
-        if (displayName) {
+        if (bodyName) {
+          lister.name = bodyName;
+          lister.fullName = bodyName;
+        } else if (!lister.name || lister.name.includes('.')) {
           lister.name = displayName;
           lister.fullName = displayName;
         }

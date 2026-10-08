@@ -124,22 +124,6 @@ async function processFirebaseUser(decodedToken, req, next) {
       ],
     }).catch(() => null);
 
-    if (!user && email) {
-      user = await User.create({
-        firebaseUid: uid,
-        email: email || undefined,
-        fullName: decodedToken.name || email.split('@')[0],
-        avatar: decodedToken.picture || '',
-        profileImage: decodedToken.picture || '',
-        phoneNumber: decodedToken.phone_number || '',
-        mobile: decodedToken.phone_number || undefined,
-        role: 'user',
-        status: 'active',
-        accountStatus: 'active',
-        isEmailVerified: decodedToken.email_verified || false,
-      }).catch(() => null);
-    }
-
     if (user) {
       req.user = user;
       req.auth = {
