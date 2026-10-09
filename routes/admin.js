@@ -58,4 +58,8 @@ router.delete('/listings/:type/:id', adminController.deleteListing);
 router.get('/contributors', adminController.getContributors);
 router.get('/contributors/:id', adminController.getContributorById);
 
+// Website Users
+router.get('/users/stats', adminController.getWebsiteUserStats);
+router.get('/users', adminController.getWebsiteUsers);
+
 module.exports = router;
