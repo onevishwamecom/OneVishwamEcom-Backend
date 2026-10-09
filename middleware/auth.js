@@ -53,7 +53,8 @@ function attachPartnerIdentity(req, email) {
 async function processFirebaseUser(decodedToken, req, next) {
   const uid = decodedToken.uid || decodedToken.user_id || decodedToken.sub || `usr_${Date.now()}`;
   const email = decodedToken.email ? decodedToken.email.toLowerCase() : '';
-  const isAdminEmail = email === (process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@onevishwam.com').toLowerCase() || email === 'ceo@onevishwam.com';
+  const bootstrapEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@onevishwam.com').toLowerCase();
+  const isAdminEmail = email === bootstrapEmail || email === 'ceo@onevishwam.com';
 
   try {
     // Check Admin collection
@@ -252,7 +253,8 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
 });
 
 const adminOnly = (req, res, next) => {
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'super-admin')) {
+  const role = req.user?.role || req.auth?.role;
+  if (role === 'admin' || role === 'super-admin') {
     return next();
   }
   next(new ApiError(403, 'Not authorized as admin'));
