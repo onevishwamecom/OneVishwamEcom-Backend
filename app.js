@@ -98,7 +98,7 @@ app.use(express.urlencoded({ extended: true }));
 const { getApps, initializeApp: initAdmin } = require('firebase-admin/app');
 if (!getApps().length) {
   initAdmin({
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app',
+    storageBucket: process.env.STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app',
   });
 }
 

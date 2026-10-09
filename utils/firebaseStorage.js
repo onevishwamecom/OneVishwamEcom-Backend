@@ -1,6 +1,6 @@
 const { getStorage } = require('firebase-admin/storage');
 
-const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
+const BUCKET_NAME = process.env.STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
 
 /**
  * Deletes a media file from Firebase Storage using its download URL

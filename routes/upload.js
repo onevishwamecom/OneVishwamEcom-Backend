@@ -53,7 +53,7 @@ router.post('/media', protect, async (req, res, next) => {
 
       try {
         const crypto = require('crypto');
-        const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
+        const BUCKET_NAME = process.env.STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
         const bucket = getStorage().bucket(BUCKET_NAME);
         const uploaded = await Promise.all(parsed.map(async (f) => {
           const isVideo = /^video\//.test(f.mimetype);
