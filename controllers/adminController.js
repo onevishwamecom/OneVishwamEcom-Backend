@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const modules = require('../modules');
 const Lister = require('../models/Lister');
 const { parsePrice } = require('../utils/priceUtils');
+const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
@@ -536,6 +537,19 @@ const deleteListing = asyncHandler(async (req, res) => {
   const mod = findModule(type);
   const item = await mod.model.findById(id);
   if (!item) throw new ApiError(404, 'Listing not found');
+
+  const media = [
+    ...(Array.isArray(item.images) ? item.images : []),
+    ...(Array.isArray(item.videos) ? item.videos : []),
+    ...(Array.isArray(item.documents) ? item.documents : []),
+    ...(Array.isArray(item.floorPlanImages) ? item.floorPlanImages : []),
+    item.videoUrl,
+    item.video,
+    item.pdfUrl,
+    item.brochure,
+  ];
+  await deleteMultipleMediaFromStorage(media);
+
   await item.deleteOne();
   new ApiResponse(200, null, 'Listing deleted permanently').send(res);
 });

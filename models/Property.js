@@ -237,6 +237,10 @@ const propertySchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    documents: {
+      type: [String],
+      default: [],
+    },
 
     // ==========================================
     // Dual-Compatibility Marketplace Fields

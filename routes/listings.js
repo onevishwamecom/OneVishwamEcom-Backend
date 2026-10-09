@@ -4,6 +4,7 @@ const modules = require('../modules');
 const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
+const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
 
 const router = express.Router();
 
@@ -238,6 +239,19 @@ router.delete('/:type/:id', protect, asyncHandler(async (req, res) => {
   const item = await mod.model.findById(req.params.id);
   if (!item) throw new ApiError(404, 'Listing not found');
   isOwnerOrAdmin(item, req);
+
+  const media = [
+    ...(Array.isArray(item.images) ? item.images : []),
+    ...(Array.isArray(item.videos) ? item.videos : []),
+    ...(Array.isArray(item.documents) ? item.documents : []),
+    ...(Array.isArray(item.floorPlanImages) ? item.floorPlanImages : []),
+    item.videoUrl,
+    item.video,
+    item.pdfUrl,
+    item.brochure,
+  ];
+  await deleteMultipleMediaFromStorage(media);
+
   await item.deleteOne();
   new ApiResponse(200, null, 'Listing deleted successfully').send(res);
 }));
