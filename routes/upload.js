@@ -34,7 +34,6 @@ router.post('/media', protect, async (req, res, next) => {
     const path = require('path');
 
     const rawBody = req.rawBody;
-    if (!rawBody) return next(new ApiError(400, 'No file data received'));
 
     const contentType = req.headers['content-type'] || '';
     const bb = Busboy({ headers: { 'content-type': contentType }, limits: { files: 11, fileSize: 50 * 1024 * 1024 } });
@@ -85,7 +84,11 @@ router.post('/media', protect, async (req, res, next) => {
     });
 
     bb.on('error', (err) => next(new ApiError(400, `Parse error: ${err.message}`)));
-    Readable.from(rawBody).pipe(bb);
+    if (rawBody) {
+      Readable.from(rawBody).pipe(bb);
+    } else {
+      req.pipe(bb);
+    }
   } catch (err) {
     next(err);
   }

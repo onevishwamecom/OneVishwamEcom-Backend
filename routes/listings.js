@@ -66,11 +66,12 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   if (isValidObjectId(req.auth?.id)) filterOr.push({ lister: req.auth.id }, { user: req.auth.id });
   if (isValidObjectId(req.user?._id)) filterOr.push({ lister: req.user._id }, { user: req.user._id });
   if (userEmail) filterOr.push({ 'contributor.email': userEmail });
+  if (req.user?.firebaseUid) filterOr.push({ 'contributor.firebaseUid': req.user.firebaseUid });
 
   for (const mod of modules) {
     try {
       if (!mod || !mod.model) continue;
-      const filter = isAdmin ? {} : (filterOr.length > 0 ? { $or: filterOr } : {});
+      const filter = isAdmin ? {} : (filterOr.length > 0 ? { $or: filterOr } : { _id: null });
 
       const items = await mod.model.find(filter).sort({ createdAt: -1 }).limit(500).lean();
       if (!items || items.length === 0) continue;

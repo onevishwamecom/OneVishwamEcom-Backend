@@ -46,9 +46,10 @@ const login = asyncHandler(async (req, res) => {
   }
 
   let isMatch = await admin.comparePassword(password);
-  if (!isMatch && (cleanEmail === 'admin@onevishwam.com' || cleanEmail === (process.env.ADMIN_BOOTSTRAP_EMAIL || '').toLowerCase())) {
-    const acceptedDefaults = ['Admin@123', 'Admin@789', process.env.ADMIN_BOOTSTRAP_PASSWORD].filter(Boolean);
-    if (acceptedDefaults.includes(password)) {
+  const bootstrapEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@onevishwam.com').toLowerCase();
+  const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+  if (!isMatch && bootstrapPassword && cleanEmail === bootstrapEmail) {
+    if (password === bootstrapPassword) {
       admin.password = password;
       await admin.save();
       isMatch = true;

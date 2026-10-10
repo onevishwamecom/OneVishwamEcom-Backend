@@ -146,8 +146,8 @@ app.use(async (req, res, next) => {
     console.error('❌ [DB MIDDLEWARE ERROR]:', err?.message || err);
     return res.status(503).json({
       success: false,
-      message: 'Database connection failed. Please verify MongoDB Atlas Network IP Whitelist (0.0.0.0/0).',
-      error: err?.message || 'Database unavailable',
+      message: 'Service Temporarily Unavailable: Database connection failed.',
+      error: process.env.NODE_ENV === 'production' ? undefined : (err?.message || 'Database unavailable'),
     });
   }
 });
