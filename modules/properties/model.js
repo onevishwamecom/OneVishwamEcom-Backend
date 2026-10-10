@@ -67,6 +67,7 @@ const propertySchema = new mongoose.Schema({
   floorPlanImages: { type: [String], default: [] },
   pdfUrl: { type: String, default: '' },
   brochure: { type: String, default: '' },
+  documents: { type: [String], default: [] },
   contact: { type: String, trim: true },
   contactEmail: { type: String, trim: true },
   email: { type: String, trim: true },

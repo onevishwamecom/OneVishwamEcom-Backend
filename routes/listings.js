@@ -4,6 +4,7 @@ const modules = require('../modules');
 const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
+const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
 
 const router = express.Router();
 
@@ -65,11 +66,12 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   if (isValidObjectId(req.auth?.id)) filterOr.push({ lister: req.auth.id }, { user: req.auth.id });
   if (isValidObjectId(req.user?._id)) filterOr.push({ lister: req.user._id }, { user: req.user._id });
   if (userEmail) filterOr.push({ 'contributor.email': userEmail });
+  if (req.user?.firebaseUid) filterOr.push({ 'contributor.firebaseUid': req.user.firebaseUid });
 
   for (const mod of modules) {
     try {
       if (!mod || !mod.model) continue;
-      const filter = isAdmin ? {} : (filterOr.length > 0 ? { $or: filterOr } : {});
+      const filter = isAdmin ? {} : (filterOr.length > 0 ? { $or: filterOr } : { _id: null });
 
       const items = await mod.model.find(filter).sort({ createdAt: -1 }).limit(500).lean();
       if (!items || items.length === 0) continue;
@@ -238,6 +240,19 @@ router.delete('/:type/:id', protect, asyncHandler(async (req, res) => {
   const item = await mod.model.findById(req.params.id);
   if (!item) throw new ApiError(404, 'Listing not found');
   isOwnerOrAdmin(item, req);
+
+  const media = [
+    ...(Array.isArray(item.images) ? item.images : []),
+    ...(Array.isArray(item.videos) ? item.videos : []),
+    ...(Array.isArray(item.documents) ? item.documents : []),
+    ...(Array.isArray(item.floorPlanImages) ? item.floorPlanImages : []),
+    item.videoUrl,
+    item.video,
+    item.pdfUrl,
+    item.brochure,
+  ];
+  await deleteMultipleMediaFromStorage(media);
+
   await item.deleteOne();
   new ApiResponse(200, null, 'Listing deleted successfully').send(res);
 }));

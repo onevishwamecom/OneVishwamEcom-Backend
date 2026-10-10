@@ -62,8 +62,8 @@ const refreshLimiter = rateLimit({
 router.post('/sync', verifyFirebaseToken, async (req, res) => {
   try {
     const { fullName, phoneNumber, mobile, role, avatar, city, area, pincode, firebaseUid: bodyUid, email: bodyEmail } = req.body;
-    const uid = req.firebaseClaims?.uid || req.user?.firebaseUid || bodyUid;
-    const email = req.firebaseClaims?.email || req.user?.email || bodyEmail;
+    const uid = req.firebaseClaims?.uid || req.user?.firebaseUid || (process.env.NODE_ENV !== 'production' ? bodyUid : null);
+    const email = req.firebaseClaims?.email || req.user?.email || (process.env.NODE_ENV !== 'production' ? bodyEmail : null);
 
     if (!uid) {
       return res.status(400).json({

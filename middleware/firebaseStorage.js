@@ -22,7 +22,7 @@ const crypto = require('crypto');
 const path = require('path');
 const ApiError = require('../utils/ApiError');
 
-const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
+const BUCKET_NAME = process.env.STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

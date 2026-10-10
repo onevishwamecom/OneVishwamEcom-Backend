@@ -34,8 +34,9 @@ exports.api = onRequest(
     cpu: 1,
     concurrency: 80,
     minInstances: 0,
-    maxInstances: 3,
-    timeoutSeconds: 120,
+    maxInstances: 5,
+    timeoutSeconds: 60,
+    secrets: ["MONGODB_URI"],
   },
   app
 );
