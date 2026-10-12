@@ -189,7 +189,7 @@ const getAllListings = asyncHandler(async (req, res) => {
           if (!listerObj || typeof listerObj !== 'object') {
             const fallbackName = item.contributor?.name || item.channelPartnerName || item.vendorName || 'Contributor';
             const fallbackEmail = item.contributor?.email || item.contactEmail || item.email || '';
-            const fallbackPhone = item.contributor?.contact || item.contributor?.phone || item.contact || item.phone || '';
+            const fallbackPhone = item.contributor?.contact || item.contact || '';
             listerObj = {
               _id: item.lister || item.user || item._id,
               name: fallbackName,
@@ -369,7 +369,7 @@ const getListingDetail = asyncHandler(async (req, res) => {
   if (!item.lister || typeof item.lister !== 'object') {
     const fallbackName = item.contributor?.name || item.channelPartnerName || item.vendorName || 'Contributor';
     const fallbackEmail = item.contributor?.email || item.contactEmail || item.email || '';
-    const fallbackPhone = item.contributor?.contact || item.contributor?.phone || item.contact || item.phone || '';
+    const fallbackPhone = item.contributor?.contact || item.contact || '';
     const fallbackCity = item.contributor?.city || item.city || '';
 
     item.lister = {
