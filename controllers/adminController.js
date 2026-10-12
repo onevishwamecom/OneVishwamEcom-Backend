@@ -111,6 +111,7 @@ const refresh = asyncHandler(async (req, res) => {
 // ─── Listing Management ─────────────────────────────────────────────────────
 
 const CATEGORY_TO_MODULE = {
+  properties: 'properties',
   'real-estate': 'properties',
   vehicle: 'vehicles',
   grocery: 'groceries',

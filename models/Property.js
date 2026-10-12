@@ -249,7 +249,7 @@ const propertySchema = new mongoose.Schema(
     title: { type: String, trim: true, default: '' },
     subtitle: { type: String, trim: true, default: '' },
     description: { type: String, trim: true, default: '' },
-    category: { type: String, trim: true, default: 'real-estate', index: true },
+    category: { type: String, trim: true, default: 'properties', index: true },
     subcategory: { type: String, trim: true, index: true },
     purpose: { type: String, enum: ['Sell', 'Rent', 'Lease'], default: 'Sell', index: true },
     price: { type: String, trim: true, default: '' },

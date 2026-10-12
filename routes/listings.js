@@ -10,6 +10,7 @@ const router = express.Router();
 
 // Maps the listing-admin "category" field to a backend module id.
 const CATEGORY_TO_MODULE = {
+  properties: 'properties',
   'real-estate': 'properties',
   vehicle: 'vehicles',
   grocery: 'groceries',
