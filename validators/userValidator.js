@@ -8,7 +8,12 @@ const updateProfileRules = [
   body('mobile').optional().trim().matches(PHONE_REGEX).withMessage('Invalid mobile number'),
   body('city').optional().trim(),
   body('area').optional().trim(),
-  body('pincode').optional().trim().matches(/^\d{6}$/).withMessage('Pincode must be 6 digits'),
+  body('pincode').optional({ checkFalsy: true, nullable: true }).trim()
+    .custom((val) => {
+      if (!val) return true;
+      if (!/^\d{6}$/.test(val)) throw new Error('Pincode must be 6 digits');
+      return true;
+    }),
   body('notifications').optional().isObject().withMessage('Notifications must be an object'),
   body('notifications.email').optional().isBoolean().withMessage('notifications.email must be a boolean'),
   body('notifications.whatsapp').optional().isBoolean().withMessage('notifications.whatsapp must be a boolean'),

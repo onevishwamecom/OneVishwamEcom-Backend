@@ -102,7 +102,7 @@ function normalizeDocument(doc) {
     vendorName: doc.vendorName || "One Vishwam",
     channelPartnerName: doc.channelPartnerName || doc.vendorName || "One Vishwam",
     propertyType: doc.propertyType || doc.subcategory || "Residential",
-    status: doc.status || "approved",
+    status: (doc.status === "active" ? "approved" : doc.status) || "approved",
     origin: doc.origin || "channel_partner_project",
     details,
     bankLoanDetails: doc.bankLoanDetails || (doc.loanApproved ? "Approved by Bank" : "N/A"),
