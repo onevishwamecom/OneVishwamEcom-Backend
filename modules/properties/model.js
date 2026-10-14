@@ -162,8 +162,9 @@ propertySchema.pre('save', function (next) {
     if (!this.furnishing && d.furnishing) {
       this.furnishing = d.furnishing;
     }
-    if (!this.possession && d.possession) {
-      this.possession = d.possession;
+    if (d.possessionStatus || d.possession) {
+      this.possessionStatus = d.possessionStatus || d.possession;
+      this.possession = this.possessionStatus;
     }
     if (!this.parking && (d.parking || d.parkingCapacity)) {
       this.parking = d.parking || d.parkingCapacity;
@@ -222,6 +223,9 @@ propertySchema.pre('save', function (next) {
     this.possessionStatus = this.possession;
   } else if (this.possessionStatus && !this.possession) {
     this.possession = this.possessionStatus;
+  }
+  if (this.possessionStatus && this.details && typeof this.details === "object") {
+    this.details.possessionStatus = this.possessionStatus;
   }
 
   if (this.propertyType && !this.subcategory) {

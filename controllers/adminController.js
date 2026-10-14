@@ -111,6 +111,7 @@ const refresh = asyncHandler(async (req, res) => {
 // ─── Listing Management ─────────────────────────────────────────────────────
 
 const CATEGORY_TO_MODULE = {
+  properties: 'properties',
   'real-estate': 'properties',
   vehicle: 'vehicles',
   grocery: 'groceries',
@@ -189,7 +190,7 @@ const getAllListings = asyncHandler(async (req, res) => {
           if (!listerObj || typeof listerObj !== 'object') {
             const fallbackName = item.contributor?.name || item.channelPartnerName || item.vendorName || 'Contributor';
             const fallbackEmail = item.contributor?.email || item.contactEmail || item.email || '';
-            const fallbackPhone = item.contributor?.contact || item.contributor?.phone || item.contact || item.phone || '';
+            const fallbackPhone = item.contributor?.contact || item.contact || '';
             listerObj = {
               _id: item.lister || item.user || item._id,
               name: fallbackName,
@@ -369,7 +370,7 @@ const getListingDetail = asyncHandler(async (req, res) => {
   if (!item.lister || typeof item.lister !== 'object') {
     const fallbackName = item.contributor?.name || item.channelPartnerName || item.vendorName || 'Contributor';
     const fallbackEmail = item.contributor?.email || item.contactEmail || item.email || '';
-    const fallbackPhone = item.contributor?.contact || item.contributor?.phone || item.contact || item.phone || '';
+    const fallbackPhone = item.contributor?.contact || item.contact || '';
     const fallbackCity = item.contributor?.city || item.city || '';
 
     item.lister = {
@@ -427,6 +428,20 @@ const overrideListing = asyncHandler(async (req, res) => {
     const numWeight = Number(updates.weight);
     if (!isNaN(numWeight)) {
       updates.weightGrams = numWeight;
+    }
+  }
+
+  if (updates.possessionStatus !== undefined) {
+    updates.possession = updates.possessionStatus;
+    if (item.details && typeof item.details === "object") {
+      item.details.possessionStatus = updates.possessionStatus;
+      item.markModified("details");
+    }
+  } else if (updates.possession !== undefined) {
+    updates.possessionStatus = updates.possession;
+    if (item.details && typeof item.details === "object") {
+      item.details.possessionStatus = updates.possession;
+      item.markModified("details");
     }
   }
 
@@ -521,14 +536,20 @@ const updateAvailabilityStatus = asyncHandler(async (req, res) => {
   }
 
   const mod = findModule(type);
-  const item = await mod.model.findById(id);
-  if (!item) throw new ApiError(404, 'Listing not found');
-
-  item.availabilityStatus = availabilityStatus;
-  item.availabilityUpdatedAt = new Date();
-  item.availabilityUpdatedBy = req.auth.id;
-  item.updatedAt = new Date();
-  await item.save();
+  const updatedItem = await mod.model.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        availabilityStatus,
+        availabilityUpdatedAt: new Date(),
+        availabilityUpdatedBy: req.auth.id,
+        updatedAt: new Date(),
+      },
+    },
+    { new: true, runValidators: false }
+  );
+  if (!updatedItem) throw new ApiError(404, 'Listing not found');
+  const item = updatedItem;
 
   new ApiResponse(200, { item }, `Listing availability updated to ${availabilityStatus}`).send(res);
 });

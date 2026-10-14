@@ -47,6 +47,7 @@ router.get('/listings', adminController.getAllListings);
 router.get('/listings/stats', adminController.getListingStats);
 router.get('/listings/:type/:id', adminController.getListingDetail);
 router.put('/listings/:type/:id', adminController.overrideListing);
+router.patch('/listings/:type/:id', adminController.overrideListing);
 router.put('/listings/:type/:id/status', adminController.updateListingStatus);
 router.patch('/listings/:type/:id/approve', adminController.approveListing);
 router.patch('/listings/:type/:id/changes', adminController.requestChanges);

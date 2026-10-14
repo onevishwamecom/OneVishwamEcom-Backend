@@ -249,7 +249,7 @@ const propertySchema = new mongoose.Schema(
     title: { type: String, trim: true, default: '' },
     subtitle: { type: String, trim: true, default: '' },
     description: { type: String, trim: true, default: '' },
-    category: { type: String, trim: true, default: 'real-estate', index: true },
+    category: { type: String, trim: true, default: 'properties', index: true },
     subcategory: { type: String, trim: true, index: true },
     purpose: { type: String, enum: ['Sell', 'Rent', 'Lease'], default: 'Sell', index: true },
     price: { type: String, trim: true, default: '' },
@@ -273,6 +273,10 @@ const propertySchema = new mongoose.Schema(
     verified: { type: Boolean, default: false },
     viewsCount: { type: Number, default: 0, index: true },
     recentlyAdded: { type: Boolean, default: false },
+    availabilityStatus: { type: String, enum: ["available", "sold_out", "inactive"], default: "available", index: true },
+    availabilityUpdatedAt: { type: Date },
+    availabilityUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
+    possessionStatus: { type: String, trim: true, default: "" },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
     agent: {
@@ -402,6 +406,13 @@ propertySchema.pre('save', function (next) {
   }
   if (!this.landmark && d.landmark) {
     this.landmark = d.landmark;
+  }
+
+  // Sync possessionStatus
+  if (this.possessionStatus && this.details && typeof this.details === "object") {
+    this.details.possessionStatus = this.possessionStatus;
+  } else if (!this.possessionStatus && d.possessionStatus) {
+    this.possessionStatus = d.possessionStatus;
   }
 
   // Sync video and brochure aliases
