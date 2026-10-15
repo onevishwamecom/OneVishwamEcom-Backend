@@ -279,6 +279,9 @@ const propertySchema = new mongoose.Schema(
     possessionStatus: { type: String, trim: true, default: "" },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
+    listerId: { type: String, trim: true, index: true },
+    lister_id: { type: String, trim: true },
+    contributor: { type: mongoose.Schema.Types.Mixed },
     agent: {
       name: { type: String, trim: true, default: '' },
       type: { type: String, default: 'Channel Partner' },

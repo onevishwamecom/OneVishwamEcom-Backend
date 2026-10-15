@@ -66,7 +66,14 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   const filterOr = [];
   if (isValidObjectId(req.auth?.id)) filterOr.push({ lister: req.auth.id }, { user: req.auth.id });
   if (isValidObjectId(req.user?._id)) filterOr.push({ lister: req.user._id }, { user: req.user._id });
-  if (userEmail) filterOr.push({ 'contributor.email': userEmail });
+  const listerIdVal = req.auth?.listerId || req.user?.listerId;
+  if (listerIdVal) filterOr.push({ listerId: listerIdVal }, { lister_id: listerIdVal }, { 'details.listerId': listerIdVal });
+  if (req.user?.phone) filterOr.push({ listerId: req.user.phone }, { lister_id: req.user.phone });
+  if (req.auth?.id || req.user?._id) {
+    const rawIdStr = String(req.auth?.id || req.user?._id);
+    filterOr.push({ listerId: rawIdStr }, { lister_id: rawIdStr });
+  }
+  if (userEmail) filterOr.push({ 'contributor.email': userEmail }, { email: userEmail }, { contactEmail: userEmail });
   if (req.user?.firebaseUid) filterOr.push({ 'contributor.firebaseUid': req.user.firebaseUid });
 
   for (const mod of modules) {
