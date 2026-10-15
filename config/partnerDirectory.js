@@ -7,7 +7,7 @@
  */
 
 const PARTNER_REGISTRY = {
-  'co@vishwam.com': {
+  'ceo@onevishwam.com': {
     role: 'in_house',
     partnerName: 'One Vishwam',
     isVerified: true,

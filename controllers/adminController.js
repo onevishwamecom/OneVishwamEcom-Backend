@@ -24,7 +24,7 @@ const login = asyncHandler(async (req, res) => {
   if (!admin) {
     // Auto-bootstrap default Admin if DB has no admin or email matches admin bootstrap pattern
     const bootstrapEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@onevishwam.com').toLowerCase().trim();
-    const isBootstrapMatch = cleanEmail === bootstrapEmail || cleanEmail === 'ceo@onevishwam.com';
+    const isBootstrapMatch = cleanEmail === bootstrapEmail;
     const adminCount = await Admin.countDocuments().catch(() => 0);
 
     if (isBootstrapMatch || adminCount === 0) {

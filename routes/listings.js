@@ -73,13 +73,13 @@ router.get('/', protect, asyncHandler(async (req, res) => {
     const rawIdStr = String(req.auth?.id || req.user?._id);
     filterOr.push({ listerId: rawIdStr }, { lister_id: rawIdStr });
   }
-  if (userEmail) filterOr.push({ 'contributor.email': userEmail }, { email: userEmail }, { contactEmail: userEmail });
+  if (userEmail) filterOr.push({ 'contributor.email': userEmail });
   if (req.user?.firebaseUid) filterOr.push({ 'contributor.firebaseUid': req.user.firebaseUid });
 
   for (const mod of modules) {
     try {
       if (!mod || !mod.model) continue;
-      const filter = isAdmin ? {} : (filterOr.length > 0 ? { $or: filterOr } : { _id: null });
+      const filter = filterOr.length > 0 ? { $or: filterOr } : { _id: null };
 
       const items = await mod.model.find(filter).sort({ createdAt: -1 }).limit(500).lean();
       if (!items || items.length === 0) continue;

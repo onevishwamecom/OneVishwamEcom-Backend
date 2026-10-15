@@ -54,7 +54,7 @@ async function processFirebaseUser(decodedToken, req, next, isDevUnverified = fa
   const uid = decodedToken.uid || decodedToken.user_id || decodedToken.sub || `usr_${Date.now()}`;
   const email = decodedToken.email ? decodedToken.email.toLowerCase() : '';
   const bootstrapEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@onevishwam.com').toLowerCase();
-  const isAdminEmail = email === bootstrapEmail || email === 'ceo@onevishwam.com';
+  const isAdminEmail = email === bootstrapEmail;
 
   try {
     // Check Admin collection
