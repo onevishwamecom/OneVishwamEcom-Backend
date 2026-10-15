@@ -224,8 +224,14 @@ const toggleStatus = async (id, userId, userRole) => {
 };
 
 const getMyProperties = async (userId) => {
-  const items = await Property.find({ user: userId, status: { $ne: 'deleted' } })
-    .sort({ createdAt: -1 });
+  const items = await Property.find({
+    $or: [
+      { user: userId },
+      { lister: userId },
+      { listerId: String(userId) },
+    ],
+    status: { $ne: 'deleted' },
+  }).sort({ createdAt: -1 });
   return items;
 };
 
