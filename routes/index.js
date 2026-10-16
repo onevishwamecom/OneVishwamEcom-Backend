@@ -17,8 +17,11 @@ const propertyModuleRoutes = require('../modules/properties/routes');
 const propertyRoutes = require('./propertyRoutes');
 const propertyRequirementRoutes = require('./propertyRequirements');
 const financeOfferingsRoutes = require('../modules/financeOfferings/routes');
+const bulkListingRoutes = require('./bulkListing');
 
 const router = express.Router();
+
+router.use('/bulk-listing', bulkListingRoutes);
 
 router.use('/v1/auth', authRoutes);
 router.use('/v1/users', userRoutes);

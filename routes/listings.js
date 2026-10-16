@@ -99,10 +99,18 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   new ApiResponse(200, grouped, 'Listings fetched').send(res);
 }));
 
-const { bulkUploadListings } = require('../controllers/bulkListingController');
+const bulkListingController = require('../controllers/bulkListingController');
 
-// POST /api/listings/bulk-upload — bulk upload listings via Excel file
-router.post('/bulk-upload', protect, bulkUploadListings);
+// Bulk Listing Endpoints
+router.post('/bulk-upload', protect, bulkListingController.bulkUploadListings);
+router.post('/bulk/download-log', bulkListingController.recordTemplateDownloadLog);
+router.get('/bulk/download-logs', protect, adminOnly, bulkListingController.getTemplateDownloadLogs);
+router.get('/bulk/batches', protect, bulkListingController.getBulkBatches);
+router.get('/bulk/batches/:batchId', protect, bulkListingController.getBulkBatchById);
+router.post('/bulk/batches/:batchId/items', protect, bulkListingController.addItemToBatch);
+router.put('/bulk/batches/:batchId/items/:itemId', protect, bulkListingController.updateBatchItem);
+router.delete('/bulk/batches/:batchId/items/:itemId', protect, bulkListingController.deleteBatchItem);
+router.delete('/bulk/batches/:batchId', protect, bulkListingController.deleteBatch);
 
 // POST /api/listings  — create a listing owned by the authenticated account.
 router.post('/', protect, asyncHandler(async (req, res) => {
