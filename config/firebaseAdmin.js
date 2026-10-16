@@ -4,7 +4,7 @@ const { getAuth } = require('firebase-admin/auth');
 let app;
 if (!getApps().length) {
   app = initializeApp({
-    projectId: process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || 'onevishwam',
+    projectId: process.env.FB_PROJECT_ID || process.env.GCLOUD_PROJECT || 'onevishwam',
   });
 } else {
   app = getApps()[0];

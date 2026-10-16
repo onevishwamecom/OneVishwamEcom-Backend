@@ -36,13 +36,31 @@ const financeSchema = new mongoose.Schema({
   availability: { type: String, trim: true },
   status: { type: String, enum: ['active', 'inactive', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'active', index: true },
   featured: { type: Boolean, default: false, index: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
-  lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
   availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
+  toJSON: {
+    virtuals: true,
+    transform: (doc, ret) => {
+      delete ret.__v;
+      ret.lister = ret.lister || ret.createdBy;
+      ret.user = ret.createdBy;
+      return ret;
+    },
+  },
   toObject: { virtuals: true },
+});
+
+financeSchema.virtual('lister', {
+  ref: 'Lister',
+  localField: 'createdBy',
+  foreignField: '_id',
+  justOne: true,
+});
+
+financeSchema.virtual('user').get(function () {
+  return this.createdBy;
 });
 
 financeSchema.index({ category: 1, status: 1 });

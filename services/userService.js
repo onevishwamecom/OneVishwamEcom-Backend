@@ -2,11 +2,17 @@ const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 
 const updateProfile = async (userId, updates) => {
-  const allowed = ['fullName', 'mobile', 'city', 'area', 'pincode'];
+  const allowed = ['name', 'fullName', 'mobile', 'city', 'area', 'pincode'];
   const data = {};
 
   for (const key of allowed) {
     if (updates[key] !== undefined) data[key] = updates[key];
+  }
+
+  if (data.name !== undefined) {
+    data.fullName = data.name;
+  } else if (data.fullName !== undefined) {
+    data.name = data.fullName;
   }
 
   if (updates.profileImage !== undefined) {

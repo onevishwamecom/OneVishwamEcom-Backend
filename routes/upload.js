@@ -34,7 +34,6 @@ router.post('/media', protect, async (req, res, next) => {
     const path = require('path');
 
     const rawBody = req.rawBody;
-    if (!rawBody) return next(new ApiError(400, 'No file data received'));
 
     const contentType = req.headers['content-type'] || '';
     const bb = Busboy({ headers: { 'content-type': contentType }, limits: { files: 11, fileSize: 50 * 1024 * 1024 } });
@@ -53,7 +52,7 @@ router.post('/media', protect, async (req, res, next) => {
 
       try {
         const crypto = require('crypto');
-        const BUCKET_NAME = process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
+        const BUCKET_NAME = process.env.STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app';
         const bucket = getStorage().bucket(BUCKET_NAME);
         const uploaded = await Promise.all(parsed.map(async (f) => {
           const isVideo = /^video\//.test(f.mimetype);
@@ -85,7 +84,11 @@ router.post('/media', protect, async (req, res, next) => {
     });
 
     bb.on('error', (err) => next(new ApiError(400, `Parse error: ${err.message}`)));
-    Readable.from(rawBody).pipe(bb);
+    if (rawBody) {
+      Readable.from(rawBody).pipe(bb);
+    } else {
+      req.pipe(bb);
+    }
   } catch (err) {
     next(err);
   }

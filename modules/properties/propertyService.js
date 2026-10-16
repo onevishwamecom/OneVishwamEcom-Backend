@@ -6,13 +6,13 @@ const LISTED_WITHIN_DAYS = {
 };
 
 const SORT_OPTIONS = {
-  latest: { createdAt: -1 },
-  oldest: { createdAt: 1 },
-  'price-low': { numericPrice: 1 },
-  'price-high': { numericPrice: -1 },
-  'area-low': { numericArea: 1 },
-  'area-high': { numericArea: -1 },
-  viewed: { viewsCount: -1 },
+  latest: { priority: -1, createdAt: -1 },
+  oldest: { priority: -1, createdAt: 1 },
+  'price-low': { priority: -1, numericPrice: 1 },
+  'price-high': { priority: -1, numericPrice: -1 },
+  'area-low': { priority: -1, numericArea: 1 },
+  'area-high': { priority: -1, numericArea: -1 },
+  viewed: { priority: -1, viewsCount: -1 },
 };
 
 function buildFilter(query) {
@@ -120,7 +120,7 @@ const getById = async (id) => {
 
 const getFeatured = async () => {
   const items = await Property.find({ featured: true, status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out'] } })
-    .sort({ createdAt: -1 })
+    .sort({ priority: -1, createdAt: -1 })
     .limit(6)
     .lean();
   return { items };
@@ -129,7 +129,7 @@ const getFeatured = async () => {
 const getLatest = async (limit = 6) => {
   const l = Math.min(20, Number(limit));
   const items = await Property.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out'] } })
-    .sort({ createdAt: -1 })
+    .sort({ priority: -1, createdAt: -1 })
     .limit(l)
     .lean();
   return { items };
@@ -148,7 +148,7 @@ const getSimilar = async (id) => {
       { area: property.area },
     ],
   })
-    .sort({ createdAt: -1 })
+    .sort({ priority: -1, createdAt: -1 })
     .limit(4)
     .lean();
 
@@ -224,8 +224,14 @@ const toggleStatus = async (id, userId, userRole) => {
 };
 
 const getMyProperties = async (userId) => {
-  const items = await Property.find({ user: userId, status: { $ne: 'deleted' } })
-    .sort({ createdAt: -1 });
+  const items = await Property.find({
+    $or: [
+      { user: userId },
+      { lister: userId },
+      { listerId: String(userId) },
+    ],
+    status: { $ne: 'deleted' },
+  }).sort({ createdAt: -1 });
   return items;
 };
 

@@ -164,8 +164,8 @@ const propertySchema = new mongoose.Schema(
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Creator User reference is required'],
+      ref: 'Lister',
+      required: [true, 'Creator Lister reference is required'],
       index: true,
     },
     status: {
@@ -178,6 +178,11 @@ const propertySchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: '',
+      index: true,
+    },
+    priority: {
+      type: Number,
+      default: 0,
       index: true,
     },
 
@@ -209,21 +214,7 @@ const propertySchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
-    video: {
-      type: String,
-      trim: true,
-      default: '',
-    },
     videoUrl: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    videos: {
-      type: [String],
-      default: [],
-    },
-    brochure: {
       type: String,
       trim: true,
       default: '',
@@ -239,18 +230,16 @@ const propertySchema = new mongoose.Schema(
     },
 
     // ==========================================
-    // Dual-Compatibility Marketplace Fields
-    // (Ensures frontend cards, filters, and seed scripts remain 100% functional)
+    // Marketplace Root Fields
     // ==========================================
     title: { type: String, trim: true, default: '' },
     subtitle: { type: String, trim: true, default: '' },
     description: { type: String, trim: true, default: '' },
-    category: { type: String, trim: true, default: 'real-estate', index: true },
+    category: { type: String, trim: true, default: 'properties', index: true },
     subcategory: { type: String, trim: true, index: true },
     purpose: { type: String, enum: ['Sell', 'Rent', 'Lease'], default: 'Sell', index: true },
     price: { type: String, trim: true, default: '' },
     numericPrice: { type: Number, default: 0, index: true },
-    rawPrice: { type: Number, index: true },
     priceType: { type: String, default: 'fixed', trim: true },
     priceSuffix: { type: String, default: '', trim: true },
     negotiable: { type: Boolean, default: false },
@@ -259,16 +248,20 @@ const propertySchema = new mongoose.Schema(
     city: { type: String, lowercase: true, trim: true, default: 'bengaluru', index: true },
     area: { type: String, trim: true, default: '', index: true },
     pincode: { type: String, trim: true, default: '' },
-    location: { type: String, trim: true, default: '' },
+    address: { type: String, trim: true, default: '' },
+    landmark: { type: String, trim: true, default: '' },
     contact: { type: String, trim: true, default: '' },
     contactEmail: { type: String, trim: true, default: '' },
-    email: { type: String, trim: true, default: '' },
     featured: { type: Boolean, default: false, index: true },
     verified: { type: Boolean, default: false },
     viewsCount: { type: Number, default: 0, index: true },
     recentlyAdded: { type: Boolean, default: false },
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
-    lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
+    availabilityStatus: { type: String, enum: ["available", "sold_out", "inactive"], default: "available", index: true },
+    availabilityUpdatedAt: { type: Date },
+    availabilityUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Admin" },
+    possessionStatus: { type: String, trim: true, default: "" },
+    listerId: { type: String, trim: true, index: true },
+    contributor: { type: mongoose.Schema.Types.Mixed },
     agent: {
       name: { type: String, trim: true, default: '' },
       type: { type: String, default: 'Channel Partner' },
@@ -287,7 +280,7 @@ const propertySchema = new mongoose.Schema(
           ret.details.apartmentName ||
           ret.details.projectName ||
           ret.details.propertyName ||
-          `${ret.propertyType} Property`;
+          `${ret.propertyType || 'Residential'} Property`;
         ret.price = ret.price || ret.details.expectedPrice || ret.details.expectedPricePerAcre || '';
         ret.channelPartnerName = ret.channelPartnerName || ret.details.channelPartnerName || '';
         ret.bankLoanDetails = ret.bankLoanDetails || ret.details.bankLoanDetails || '';
@@ -301,8 +294,26 @@ const propertySchema = new mongoose.Schema(
             .filter((d) => d && d.fileType && d.fileType.startsWith('image'))
             .map((d) => d.url);
         }
-        ret.video = ret.video || ret.videoUrl || (Array.isArray(ret.videos) && ret.videos[0]) || '';
-        ret.brochure = ret.brochure || ret.pdfUrl || '';
+
+        // Virtual backwards-compatible aliases (ensures zero breaking changes across all frontends)
+        const v = ret.videoUrl || '';
+        ret.video = v;
+        ret.videos = v ? [v] : [];
+        ret.brochure = ret.pdfUrl || '';
+        ret.email = ret.contactEmail || '';
+        ret.location = ret.address || '';
+        ret.rawPrice = ret.numericPrice || 0;
+        ret.isPriority = Boolean(ret.priority && ret.priority > 0);
+        ret.lister = ret.lister || ret.createdBy;
+        ret.user = ret.createdBy;
+
+        // Virtual details compatibility
+        if (!ret.details.propertyName) ret.details.propertyName = ret.title;
+        if (!ret.details.expectedPrice) ret.details.expectedPrice = ret.price;
+        if (!ret.details.possessionStatus) ret.details.possessionStatus = ret.possessionStatus;
+        if (!ret.details.vendorName) ret.details.vendorName = ret.vendorName;
+        if (!ret.details.channelPartnerName) ret.details.channelPartnerName = ret.channelPartnerName;
+
         return ret;
       },
     },
@@ -310,11 +321,41 @@ const propertySchema = new mongoose.Schema(
   }
 );
 
+// Virtual properties for direct document access
+propertySchema.virtual('lister', {
+  ref: 'Lister',
+  localField: 'createdBy',
+  foreignField: '_id',
+  justOne: true,
+});
+propertySchema.virtual('video').get(function () {
+  return this.videoUrl || '';
+});
+propertySchema.virtual('videos').get(function () {
+  return this.videoUrl ? [this.videoUrl] : [];
+});
+propertySchema.virtual('brochure').get(function () {
+  return this.pdfUrl || '';
+});
+propertySchema.virtual('email').get(function () {
+  return this.contactEmail || '';
+});
+propertySchema.virtual('location').get(function () {
+  return this.address || '';
+});
+propertySchema.virtual('rawPrice').get(function () {
+  return this.numericPrice || 0;
+});
+propertySchema.virtual('isPriority').get(function () {
+  return Boolean(this.priority && this.priority > 0);
+});
+propertySchema.virtual('user').get(function () {
+  return this.createdBy;
+});
+
 // Compound Indexes for fast dashboard & filter queries
 propertySchema.index({ propertyType: 1, status: 1 });
 propertySchema.index({ createdBy: 1, createdAt: -1 });
-propertySchema.index({ user: 1, createdAt: -1 });
-propertySchema.index({ lister: 1, createdAt: -1 });
 propertySchema.index({ city: 1, area: 1 });
 propertySchema.index({ createdAt: -1 });
 
@@ -347,13 +388,20 @@ propertySchema.index(
 
 // Pre-save synchronization hook
 propertySchema.pre('save', function (next) {
-  // Sync createdBy <-> user for dual compatibility
-  if (!this.user && this.createdBy) {
-    this.user = this.createdBy;
-  }
-  if (!this.createdBy && this.user) {
-    this.createdBy = this.user;
-  }
+  // Consolidate duplicate incoming media fields
+  if (!this.videoUrl && this.video) this.videoUrl = this.video;
+  if (!this.videoUrl && Array.isArray(this.videos) && this.videos[0]) this.videoUrl = this.videos[0];
+  this.video = undefined;
+  this.videos = undefined;
+
+  if (!this.pdfUrl && this.brochure) this.pdfUrl = this.brochure;
+  this.brochure = undefined;
+
+  if (!this.contactEmail && this.email) this.contactEmail = this.email;
+  this.email = undefined;
+
+  if (!this.address && this.location) this.address = this.location;
+  this.location = undefined;
 
   // Derive title from details if empty
   const d = this.details || {};
@@ -382,7 +430,6 @@ propertySchema.pre('save', function (next) {
       } else {
         this.numericPrice = num;
       }
-      this.rawPrice = this.numericPrice;
     }
   }
 
@@ -391,11 +438,28 @@ propertySchema.pre('save', function (next) {
     this.loanApproved = !this.bankLoanDetails.toLowerCase().includes('no');
   }
 
-  // Sync video and brochure aliases
-  if (this.video && !this.videoUrl) this.videoUrl = this.video;
-  if (this.videoUrl && !this.video) this.video = this.videoUrl;
-  if (this.brochure && !this.pdfUrl) this.pdfUrl = this.brochure;
-  if (this.pdfUrl && !this.brochure) this.brochure = this.pdfUrl;
+  if (!this.address && d.address) {
+    this.address = d.address;
+  }
+  if (!this.landmark && d.landmark) {
+    this.landmark = d.landmark;
+  }
+
+  // Clean redundant root fields from details so they don't duplicate
+  if (this.details && typeof this.details === 'object') {
+    delete this.details.propertyName;
+    delete this.details.expectedPrice;
+    delete this.details.negotiable;
+    delete this.details.channelPartnerName;
+    delete this.details.vendorName;
+    delete this.details.description;
+    delete this.details.possessionStatus;
+    delete this.details.listerId;
+  }
+
+  if (this.lister && !this.createdBy) {
+    this.createdBy = this.lister;
+  }
 
   next();
 });

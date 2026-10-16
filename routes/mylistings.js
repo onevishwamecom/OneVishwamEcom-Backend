@@ -12,8 +12,16 @@ router.get('/', protect, asyncHandler(async (req, res) => {
 
   // Support both user and lister accounts for backward compatibility
   // Listers use 'lister' field, users use 'user' field
+  const listerIdVal = req.user?.listerId || req.auth?.listerId || req.user?.phone;
+  const listerOr = [
+    { lister: req.auth.id },
+    { user: req.auth.id },
+  ];
+  if (listerIdVal) listerOr.push({ listerId: listerIdVal }, { lister_id: listerIdVal }, { 'details.listerId': listerIdVal });
+  if (req.auth?.id) listerOr.push({ listerId: String(req.auth.id) });
+
   const filter = req.auth.accountType === 'lister' 
-    ? { lister: req.auth.id } 
+    ? { $or: listerOr } 
     : { user: req.auth.id };
   
   if (status) filter.status = status;

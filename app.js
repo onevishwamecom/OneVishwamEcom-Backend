@@ -98,7 +98,7 @@ app.use(express.urlencoded({ extended: true }));
 const { getApps, initializeApp: initAdmin } = require('firebase-admin/app');
 if (!getApps().length) {
   initAdmin({
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app',
+    storageBucket: process.env.STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || 'onevishwam.firebasestorage.app',
   });
 }
 
@@ -133,14 +133,22 @@ app.use(async (req, res, next) => {
   ) {
     return next();
   }
-  if (mongoose.connection.readyState === 1) {
+  if (mongoose.connection && mongoose.connection.readyState === 1) {
     return next();
   }
   try {
     await connectDB();
-    next();
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      return next();
+    }
+    throw new Error('Database connection is not ready');
   } catch (err) {
-    next(err);
+    console.error('❌ [DB MIDDLEWARE ERROR]:', err?.message || err);
+    return res.status(503).json({
+      success: false,
+      message: 'Service Temporarily Unavailable: Database connection failed.',
+      error: process.env.NODE_ENV === 'production' ? undefined : (err?.message || 'Database unavailable'),
+    });
   }
 });
 
@@ -156,19 +164,26 @@ app.get(['/health', '/api/health'], (req, res) => {
 app.get(['/health/db', '/api/health/db'], async (req, res) => {
   try {
     await connectDB();
-    const mongoose = require('mongoose');
+    if (!mongoose.connection || !mongoose.connection.db) {
+      return res.status(503).json({
+        success: false,
+        status: 'error',
+        message: 'Database connection not ready',
+      });
+    }
     await mongoose.connection.db.admin().ping();
     res.json({
       success: true,
       status: 'active',
       database: 'connected',
+      host: mongoose.connection.host,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
-    res.status(500).json({
+    res.status(503).json({
       success: false,
       status: 'error',
-      message: err.message,
+      message: err?.message || 'Database ping failed',
     });
   }
 });

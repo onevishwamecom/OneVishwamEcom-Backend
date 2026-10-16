@@ -9,6 +9,7 @@ const {
   updatePropertyStatus,
 } = require('../controllers/propertyController');
 
+const mongoose = require("mongoose");
 const router = express.Router();
 
 /**
@@ -37,8 +38,13 @@ router.post('/', protect, optionalUpload, validatePropertyListing, createPropert
 // GET /api/properties — Paginated list with filtering support
 router.get('/', optionalAuth, getProperties);
 
-// GET /api/properties/:id — Complete property details by ID
-router.get('/:id', optionalAuth, getPropertyById);
+// GET /api/properties/:id — Complete property details by ID (falls through to sub-routes if not a MongoDB ObjectId)
+router.get('/:id', (req, res, next) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return next();
+  }
+  optionalAuth(req, res, () => getPropertyById(req, res, next));
+});
 
 // PATCH /api/properties/:id/status — Admin status update (approved / rejected)
 router.patch('/:id/status', protect, adminOnly, updatePropertyStatus);

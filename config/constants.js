@@ -1,5 +1,5 @@
 const CATEGORIES = [
-  'real-estate', 'vehicle', 'garment', 'grocery', 'jewellery', 'loan', 'service'
+  'properties', 'vehicle', 'garment', 'grocery', 'jewellery', 'loan', 'service'
 ];
 
 const LISTING_STATUS = ['active', 'pending', 'sold', 'inactive'];

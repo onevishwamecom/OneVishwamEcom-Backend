@@ -4,11 +4,13 @@ const modules = require('../modules');
 const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
+const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
 
 const router = express.Router();
 
 // Maps the listing-admin "category" field to a backend module id.
 const CATEGORY_TO_MODULE = {
+  properties: 'properties',
   'real-estate': 'properties',
   vehicle: 'vehicles',
   grocery: 'groceries',
@@ -30,11 +32,11 @@ function findModule(type) {
 
 // Status constants
 const LISTER_ALLOWED_STATUSES = ['pending', 'changes-required'];
-const LISTER_EDITABLE_STATUSES = ['pending', 'changes-required', 'approved'];
+const LISTER_EDITABLE_STATUSES = ['pending', 'changes-required', 'approved', 'cancelled', 'rejected'];
 const ADMIN_STATUS_TRANSITIONS = {
-  approve: { from: ['pending', 'changes-required'], to: 'approved' },
-  changes: { from: ['pending'], to: 'changes-required' },
-  cancel: { from: ['pending', 'changes-required', 'approved'], to: 'cancelled' },
+  approve: { from: ['pending', 'changes-required', 'approved', 'active', 'cancelled', 'rejected'], to: 'approved' },
+  changes: { from: ['pending', 'changes-required', 'approved', 'active', 'cancelled', 'rejected'], to: 'changes-required' },
+  cancel: { from: ['pending', 'changes-required', 'approved', 'active', 'cancelled', 'rejected'], to: 'cancelled' },
 };
 
 function normalizeListingItem(item) {
@@ -62,14 +64,22 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   const isValidObjectId = (val) => val && mongoose.Types.ObjectId.isValid(String(val));
 
   const filterOr = [];
-  if (isValidObjectId(req.auth?.id)) filterOr.push({ lister: req.auth.id }, { user: req.auth.id });
-  if (isValidObjectId(req.user?._id)) filterOr.push({ lister: req.user._id }, { user: req.user._id });
+  if (isValidObjectId(req.auth?.id)) filterOr.push({ createdBy: req.auth.id }, { lister: req.auth.id }, { user: req.auth.id });
+  if (isValidObjectId(req.user?._id)) filterOr.push({ createdBy: req.user._id }, { lister: req.user._id }, { user: req.user._id });
+  const listerIdVal = req.auth?.listerId || req.user?.listerId;
+  if (listerIdVal) filterOr.push({ listerId: listerIdVal }, { lister_id: listerIdVal }, { 'details.listerId': listerIdVal });
+  if (req.user?.phone) filterOr.push({ listerId: req.user.phone }, { lister_id: req.user.phone });
+  if (req.auth?.id || req.user?._id) {
+    const rawIdStr = String(req.auth?.id || req.user?._id);
+    filterOr.push({ listerId: rawIdStr }, { lister_id: rawIdStr });
+  }
   if (userEmail) filterOr.push({ 'contributor.email': userEmail });
+  if (req.user?.firebaseUid) filterOr.push({ 'contributor.firebaseUid': req.user.firebaseUid });
 
   for (const mod of modules) {
     try {
       if (!mod || !mod.model) continue;
-      const filter = isAdmin ? {} : (filterOr.length > 0 ? { $or: filterOr } : {});
+      const filter = filterOr.length > 0 ? { $or: filterOr } : { _id: null };
 
       const items = await mod.model.find(filter).sort({ createdAt: -1 }).limit(500).lean();
       if (!items || items.length === 0) continue;
@@ -110,8 +120,6 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     ? req.auth.id
     : (isValidObjectId(req.user?._id) ? req.user._id : new mongoose.Types.ObjectId());
 
-  data.user = ownerId;
-  data.lister = ownerId;
   data.createdBy = ownerId;
 
   // Server-side automatic identity resolution for One Vishwam vs External Listers
@@ -122,17 +130,52 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     data.channelPartnerName = 'One Vishwam';
     data.vendorName = 'One Vishwam';
     data.origin = 'in_house_project';
+    data.priority = 1;
+    data.isPriority = true;
+    data.featured = true;
   } else {
-    data.channelPartnerName = data.channelPartnerName || req.user?.partnerName || req.auth?.partnerName || req.user?.fullName || req.user?.name || req.auth?.name || 'External Partner';
-    data.vendorName = data.vendorName || req.user?.fullName || req.user?.name || req.auth?.name || req.user?.partnerName || req.auth?.partnerName || 'Independent Owner';
+    data.channelPartnerName = data.channelPartnerName || req.user?.partnerName || req.auth?.partnerName || req.user?.name || req.user?.fullName || req.auth?.name || 'External Partner';
+    data.vendorName = data.vendorName || req.user?.name || req.user?.fullName || req.auth?.name || req.user?.partnerName || req.auth?.partnerName || 'Independent Owner';
     data.origin = req.user?.origin || req.auth?.origin || 'channel_partner_project';
   }
 
   data.bankLoanDetails = data.bankLoanDetails || 'Available on request';
 
+  const contributorName =
+    req.user?.name ||
+    req.user?.fullName ||
+    req.auth?.name ||
+    body.contributor?.name ||
+    data.vendorName ||
+    data.channelPartnerName ||
+    (userEmail ? userEmail.split('@')[0] : '') ||
+    'Contributor';
+
+  const contributorPhone = req.user?.phone || req.user?.phoneNumber || req.user?.mobile || body.contributor?.contact || body.contact || '';
+  const contributorCity = req.user?.city || body.contributor?.city || body.city || '';
+
+  data.contributor = {
+    _id: ownerId,
+    id: ownerId,
+    name: contributorName,
+    email: userEmail || body.contactEmail || '',
+    contact: contributorPhone,
+    phone: contributorPhone,
+    city: contributorCity,
+    type: req.auth?.accountType || 'lister',
+    createdAt: new Date(),
+  };
+
+  // Clean redundant root fields from details if present
   if (data.details && typeof data.details === 'object') {
-    data.details.channelPartnerName = data.channelPartnerName;
-    data.details.vendorName = data.vendorName;
+    delete data.details.channelPartnerName;
+    delete data.details.vendorName;
+    delete data.details.propertyName;
+    delete data.details.expectedPrice;
+    delete data.details.description;
+    delete data.details.listerId;
+    delete data.details.possessionStatus;
+    delete data.details.negotiable;
   }
 
   const item = await mod.model.create(data);
@@ -193,13 +236,19 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   }
 
   const wasApproved = item.status === 'approved';
+  const wasCancelled = item.status === 'cancelled' || item.status === 'rejected';
   Object.assign(item, body);
 
-  // If user/lister edits a changes-required or approved listing, it goes back to pending
-  if (req.auth.role !== 'admin' && (item.status === 'changes-required' || wasApproved)) {
-    item.status = 'pending';
-    // Clear any previous admin comment when resubmitting
-    item.adminComment = undefined;
+  // Enforce priority for in-house / ceo@onevishwam.com listings
+  const userEmail = (req.user?.email || req.auth?.email || '').toLowerCase();
+  const isOneVishwamUser = userEmail === 'ceo@onevishwam.com' || userEmail.endsWith('@onevishwam.com') || req.user?.role === 'in_house' || req.auth?.role === 'in_house';
+  if (isOneVishwamUser || item.origin === 'in_house_project') {
+    item.priority = 1;
+    item.isPriority = true;
+    item.featured = true;
+    item.origin = 'in_house_project';
+    item.channelPartnerName = 'One Vishwam';
+    item.vendorName = 'One Vishwam';
   }
 
   await item.save();
@@ -212,6 +261,19 @@ router.delete('/:type/:id', protect, asyncHandler(async (req, res) => {
   const item = await mod.model.findById(req.params.id);
   if (!item) throw new ApiError(404, 'Listing not found');
   isOwnerOrAdmin(item, req);
+
+  const media = [
+    ...(Array.isArray(item.images) ? item.images : []),
+    ...(Array.isArray(item.videos) ? item.videos : []),
+    ...(Array.isArray(item.documents) ? item.documents : []),
+    ...(Array.isArray(item.floorPlanImages) ? item.floorPlanImages : []),
+    item.videoUrl,
+    item.video,
+    item.pdfUrl,
+    item.brochure,
+  ];
+  await deleteMultipleMediaFromStorage(media);
+
   await item.deleteOne();
   new ApiResponse(200, null, 'Listing deleted successfully').send(res);
 }));
@@ -303,12 +365,8 @@ router.patch('/admin/:type/:id/approve', protect, adminOnly, asyncHandler(async 
   const item = await mod.model.findById(req.params.id);
   if (!item) throw new ApiError(404, 'Listing not found');
 
-  const transition = ADMIN_STATUS_TRANSITIONS.approve;
-  if (!transition.from.includes(item.status)) {
-    throw new ApiError(400, `Cannot approve listing with status "${item.status}"`);
-  }
-
-  item.status = transition.to;
+  item.status = 'approved';
+  item.adminComment = undefined;
   item.updatedAt = new Date();
   await item.save();
 
@@ -321,13 +379,8 @@ router.patch('/admin/:type/:id/changes', protect, adminOnly, asyncHandler(async 
   const item = await mod.model.findById(req.params.id);
   if (!item) throw new ApiError(404, 'Listing not found');
 
-  const transition = ADMIN_STATUS_TRANSITIONS.changes;
-  if (!transition.from.includes(item.status)) {
-    throw new ApiError(400, `Cannot request changes for listing with status "${item.status}"`);
-  }
-
   const reason = req.body.reason || 'Please make the required changes and resubmit.';
-  item.status = transition.to;
+  item.status = 'changes-required';
   item.adminComment = reason;
   item.updatedAt = new Date();
   await item.save();

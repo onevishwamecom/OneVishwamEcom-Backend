@@ -48,9 +48,12 @@ const errorHandler = (err, req, res, next) => {
     message = err.message || 'Too many requests, please try again later';
   }
 
-  if (err.statusCode >= 500) {
+  if (statusCode >= 500) {
     // Log full error server-side for debugging
     console.error(`[ERROR] ${req.method} ${req.originalUrl}`, err);
+    if (process.env.NODE_ENV === 'production') {
+      message = 'An unexpected internal error occurred. Please try again later.';
+    }
   }
 
   res.status(statusCode).json({

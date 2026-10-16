@@ -45,11 +45,16 @@ const base = createCRUDController({
         sanitized.details.channelPartnerName = sanitized.channelPartnerName;
       }
     }
-    if (req.user?.origin || req.auth?.origin) {
-      sanitized.origin = req.user?.origin || req.auth?.origin;
-    } else if (req.user?.role === 'in_house' || req.auth?.role === 'in_house') {
+    const uEmail = (req.user?.email || req.auth?.email || '').toLowerCase();
+    if (sanitized.origin === 'in_house_project' || req.user?.role === 'in_house' || req.auth?.role === 'in_house' || uEmail === 'ceo@onevishwam.com') {
       sanitized.origin = 'in_house_project';
       sanitized.channelPartnerName = 'One Vishwam';
+      sanitized.vendorName = 'One Vishwam';
+      sanitized.priority = 1;
+      sanitized.isPriority = true;
+      sanitized.featured = true;
+    } else if (req.user?.origin || req.auth?.origin) {
+      sanitized.origin = req.user?.origin || req.auth?.origin;
     }
     return sanitized;
   },
@@ -58,6 +63,15 @@ const base = createCRUDController({
     if (sanitized.rawPrice && !sanitized.numericPrice) sanitized.numericPrice = sanitized.rawPrice;
     if (typeof sanitized.amenities === 'string') {
       sanitized.amenities = sanitized.amenities.split(',').map((a) => a.trim()).filter(Boolean);
+    }
+    const uEmail = (req.user?.email || req.auth?.email || '').toLowerCase();
+    if (sanitized.origin === 'in_house_project' || req.user?.role === 'in_house' || req.auth?.role === 'in_house' || uEmail === 'ceo@onevishwam.com' || uEmail.endsWith('@onevishwam.com')) {
+      sanitized.origin = 'in_house_project';
+      sanitized.channelPartnerName = 'One Vishwam';
+      sanitized.vendorName = 'One Vishwam';
+      sanitized.priority = 1;
+      sanitized.isPriority = true;
+      sanitized.featured = true;
     }
     return sanitized;
   },

@@ -2,13 +2,21 @@ const { body } = require('express-validator');
 const { NAME_MIN_LENGTH, NAME_MAX_LENGTH, PHONE_REGEX } = require('../config/authConfig');
 
 const updateProfileRules = [
+  body('name').optional().trim()
+    .isLength({ min: NAME_MIN_LENGTH, max: NAME_MAX_LENGTH })
+    .withMessage(`Name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`),
   body('fullName').optional().trim()
     .isLength({ min: NAME_MIN_LENGTH, max: NAME_MAX_LENGTH })
     .withMessage(`Name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`),
   body('mobile').optional().trim().matches(PHONE_REGEX).withMessage('Invalid mobile number'),
   body('city').optional().trim(),
   body('area').optional().trim(),
-  body('pincode').optional().trim().matches(/^\d{6}$/).withMessage('Pincode must be 6 digits'),
+  body('pincode').optional({ checkFalsy: true, nullable: true }).trim()
+    .custom((val) => {
+      if (!val) return true;
+      if (!/^\d{6}$/.test(val)) throw new Error('Pincode must be 6 digits');
+      return true;
+    }),
   body('notifications').optional().isObject().withMessage('Notifications must be an object'),
   body('notifications.email').optional().isBoolean().withMessage('notifications.email must be a boolean'),
   body('notifications.whatsapp').optional().isBoolean().withMessage('notifications.whatsapp must be a boolean'),

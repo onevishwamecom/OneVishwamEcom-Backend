@@ -16,15 +16,40 @@ const grocerySchema = new mongoose.Schema({
   video: { type: String, default: '', trim: true },
   videoUrl: { type: String, default: '', trim: true },
   videos: { type: [String], default: [] },
+  documents: { type: [String], default: [] },
+  pdfUrl: { type: String, default: '' },
+  brochure: { type: String, default: '' },
   expiryDate: { type: Date },
   brand: { type: String, trim: true },
   organic: { type: Boolean, default: false },
   discount: { type: Number, default: 0, min: 0, max: 100 },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
   availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
   status: { type: String, enum: ['available', 'out-of-stock', 'discontinued', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'available', index: true },
-}, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
+}, {
+  timestamps: true,
+  toJSON: {
+    virtuals: true,
+    transform: (doc, ret) => {
+      delete ret.__v;
+      ret.lister = ret.lister || ret.createdBy;
+      ret.user = ret.createdBy;
+      return ret;
+    },
+  },
+  toObject: { virtuals: true },
+});
+
+grocerySchema.virtual('lister', {
+  ref: 'Lister',
+  localField: 'createdBy',
+  foreignField: '_id',
+  justOne: true,
+});
+
+grocerySchema.virtual('user').get(function () {
+  return this.createdBy;
+});
 
 grocerySchema.index({ name: 1, category: 1 });
 grocerySchema.index({ createdAt: -1 });

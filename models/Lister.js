@@ -13,6 +13,12 @@ const listerSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    firebaseUid: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     name: {
       type: String,
       required: [true, 'Name is required'],
@@ -31,19 +37,22 @@ const listerSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: [true, 'Phone number is required'],
       unique: true,
+      sparse: true,
       trim: true,
     },
     password: {
       type: String,
-      required: [true, 'Password is required'],
       minlength: [8, 'Password must be at least 8 characters'],
       select: false,
     },
     phoneVerified: {
       type: Boolean,
       default: false,
+    },
+    role: {
+      type: String,
+      default: 'lister',
     },
     status: {
       type: String,
@@ -112,7 +121,6 @@ listerSchema.methods.toListerJSON = function () {
     accountType: 'lister',
     listerId: this.listerId,
     name: this.name,
-    fullName: this.name,
     email: this.email || null,
     phone: this.phone,
     mobile: this.phone,

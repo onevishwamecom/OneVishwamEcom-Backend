@@ -82,7 +82,7 @@ const createProperty = asyncHandler(async (req, res) => {
   const property = await Property.create(data);
   const populated = await Property.findById(property._id).populate(
     'createdBy',
-    'fullName name email phoneNumber'
+    'name fullName email phoneNumber profileImage avatar'
   );
 
   new ApiResponse(
@@ -153,7 +153,7 @@ const getProperties = asyncHandler(async (req, res) => {
       .sort(sortOption)
       .skip(skip)
       .limit(limit)
-      .populate('createdBy', 'fullName name email phoneNumber')
+      .populate('createdBy', 'name fullName email phoneNumber profileImage avatar')
       .lean(),
     Property.countDocuments(filter),
   ]);
@@ -181,8 +181,8 @@ const getProperties = asyncHandler(async (req, res) => {
 // @access  Public
 const getPropertyById = asyncHandler(async (req, res) => {
   const property = await Property.findById(req.params.id)
-    .populate('createdBy', 'fullName name email phoneNumber avatar')
-    .populate('user', 'fullName name email phoneNumber avatar');
+    .populate('createdBy', 'name fullName email phoneNumber profileImage avatar')
+    .populate('user', 'name fullName email phoneNumber profileImage avatar');
 
   if (!property || property.status === 'deleted') {
     throw new ApiError(404, 'Property listing not found');

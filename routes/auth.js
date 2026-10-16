@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit');
 const validate = require('../middleware/validate');
 const { protect, verifyFirebaseToken } = require('../middleware/auth');
 const User = require('../models/User');
+const Lister = require('../models/Lister');
 const ApiResponse = require('../utils/ApiResponse');
 const {
   registerRules,
@@ -60,9 +61,9 @@ const refreshLimiter = rateLimit({
 // Mandatory sync route - writes & updates authoritative copy in MongoDB Atlas
 router.post('/sync', verifyFirebaseToken, async (req, res) => {
   try {
-    const { fullName, phoneNumber, mobile, role, avatar, city, area, pincode, firebaseUid: bodyUid, email: bodyEmail } = req.body;
-    const uid = req.firebaseClaims?.uid || req.user?.firebaseUid || bodyUid;
-    const email = req.firebaseClaims?.email || req.user?.email || bodyEmail;
+    const { name, fullName, phoneNumber, mobile, role, avatar, profileImage, city, area, pincode, firebaseUid: bodyUid, email: bodyEmail } = req.body;
+    const uid = req.firebaseClaims?.uid || req.user?.firebaseUid || (process.env.NODE_ENV !== 'production' ? bodyUid : null);
+    const email = req.firebaseClaims?.email || req.user?.email || (process.env.NODE_ENV !== 'production' ? bodyEmail : null);
 
     if (!uid) {
       return res.status(400).json({
@@ -72,14 +73,88 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
     }
 
     const phone = phoneNumber || mobile;
+    const cleanEmail = email ? email.toLowerCase().trim() : undefined;
+    const cleanPhone = phone ? phone.trim() : undefined;
 
+    // Check if account already exists as a Lister in MongoDB Atlas
+    const existingLister = uid || cleanEmail ? await Lister.findOne({
+      $or: [
+        ...(uid ? [{ firebaseUid: uid }] : []),
+        ...(cleanEmail ? [{ email: cleanEmail }] : []),
+      ],
+    }) : null;
+
+    const isLister = role === 'lister' || Boolean(existingLister) || req.auth?.accountType === 'lister' || req.user?.role === 'lister';
+
+    if (isLister) {
+      const bodyName = (name || fullName || req.body.displayName)?.trim();
+      const displayName = bodyName || req.user?.name || req.user?.fullName || (cleanEmail ? cleanEmail.split('@')[0] : 'Lister');
+
+      // Clean up any accidental duplicate in User collection (users)
+      if (uid || cleanEmail) {
+        const deleteConditions = [];
+        if (uid) deleteConditions.push({ firebaseUid: uid });
+        if (cleanEmail) deleteConditions.push({ email: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
+        await User.deleteMany({ $or: deleteConditions }).catch(() => null);
+      }
+
+      let lister = await Lister.findOne({
+        $or: [
+          { firebaseUid: uid },
+          ...(cleanEmail ? [{ email: cleanEmail }] : []),
+        ],
+      });
+
+      if (lister) {
+        lister.firebaseUid = uid;
+        if (cleanEmail) lister.email = cleanEmail;
+        if (bodyName) {
+          lister.name = bodyName;
+        } else if (!lister.name || lister.name.includes('.')) {
+          lister.name = displayName;
+        }
+        if (cleanPhone) lister.phone = cleanPhone;
+        if (city) lister.city = city;
+        if (area) lister.area = area;
+        if (pincode) lister.pincode = pincode;
+        lister.status = 'ACTIVE';
+        if (!lister.listerId) {
+          lister.listerId = cleanPhone || uid;
+        }
+        await lister.save({ validateBeforeSave: false });
+      } else {
+        lister = await Lister.create({
+          listerId: cleanPhone || uid,
+          firebaseUid: uid,
+          name: displayName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          city: city || '',
+          area: area || '',
+          pincode: pincode || '',
+          status: 'ACTIVE',
+          role: 'lister',
+        });
+      }
+
+      console.log(`[Auth Sync] Successfully saved LISTER ${cleanEmail || uid} (${uid}) to MongoDB Atlas (listers collection).`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Lister saved to MongoDB Atlas (listers collection) successfully',
+        data: lister.toListerJSON ? lister.toListerJSON() : lister,
+      });
+    }
+
+    const resolvedName = (name || fullName || req.body.displayName)?.trim();
+    const resolvedImage = profileImage || avatar;
     const updateFields = {
       firebaseUid: uid,
       ...(email && { email: email.toLowerCase().trim() }),
-      ...(fullName && { fullName: fullName.trim() }),
+      ...(resolvedName && { name: resolvedName, fullName: resolvedName }),
       ...(phone && { phoneNumber: phone.trim(), mobile: phone.trim() }),
       ...(role && ['user', 'lister'].includes(role) && { role }),
-      ...(avatar && { avatar, profileImage: avatar }),
+      ...(resolvedImage && { avatar: resolvedImage, profileImage: resolvedImage }),
       ...(city && { city }),
       ...(area && { area }),
       ...(pincode && { pincode }),
@@ -113,18 +188,33 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
 // Fetch full profile on page reload from MongoDB Atlas
 router.get('/me', verifyFirebaseToken, async (req, res) => {
   try {
-    let user = req.user;
-    if (req.firebaseClaims?.uid && !user) {
-      user = await User.findOne({ firebaseUid: req.firebaseClaims.uid });
+    let account = req.user;
+    const uid = req.firebaseClaims?.uid || req.user?.firebaseUid;
+    const email = (req.firebaseClaims?.email || req.user?.email || '').toLowerCase();
+
+    if (uid && (!account || !account._id)) {
+      account = (await Lister.findOne({ firebaseUid: uid })) ||
+                (await User.findOne({ firebaseUid: uid }));
     }
 
-    if (!user) {
+    if (!account && email) {
+      account = (await Lister.findOne({ email })) ||
+                (await User.findOne({ email }));
+    }
+
+    if (!account) {
       return res.status(404).json({ success: false, message: 'User not found in MongoDB' });
     }
 
+    const responseData = account.toListerJSON
+      ? account.toListerJSON()
+      : account.toProfileJSON
+      ? account.toProfileJSON()
+      : account;
+
     return res.status(200).json({
       success: true,
-      data: user.toProfileJSON ? user.toProfileJSON() : user,
+      data: responseData,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
