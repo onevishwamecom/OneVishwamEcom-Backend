@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
@@ -140,6 +141,7 @@ const getPendingListings = asyncHandler(async (req, res) => {
     try {
       const items = await mod.model
         .find({ status: 'pending' })
+        .populate('createdBy', 'name email phone listerId')
         .populate('lister', 'name email phone listerId')
         .sort({ createdAt: -1 })
         .skip((p - 1) * l)
@@ -167,7 +169,12 @@ const getAllListings = asyncHandler(async (req, res) => {
     if (category && CATEGORY_TO_MODULE[category] && CATEGORY_TO_MODULE[category] !== mod.id) return;
     const filter = {};
     if (status) filter.status = status;
-    if (listerId) filter.lister = listerId;
+    if (listerId) {
+      filter.$or = [
+        ...(mongoose.Types.ObjectId.isValid(listerId) ? [{ createdBy: listerId }, { lister: listerId }] : []),
+        { 'contributor.email': listerId }
+      ];
+    }
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -178,6 +185,7 @@ const getAllListings = asyncHandler(async (req, res) => {
     try {
       const items = await mod.model
         .find(filter)
+        .populate('createdBy', 'name email phone listerId')
         .populate('lister', 'name email phone listerId')
         .sort({ createdAt: -1 })
         .skip((p - 1) * l)
@@ -186,13 +194,13 @@ const getAllListings = asyncHandler(async (req, res) => {
       if (items.length > 0) {
         results[mod.id] = items.map((item) => {
           const v = item.video || item.videoUrl || (Array.isArray(item.videos) && item.videos[0]) || '';
-          let listerObj = item.lister;
+          let listerObj = item.createdBy || item.lister;
           if (!listerObj || typeof listerObj !== 'object') {
             const fallbackName = item.contributor?.name || item.channelPartnerName || item.vendorName || 'Contributor';
             const fallbackEmail = item.contributor?.email || item.contactEmail || item.email || '';
             const fallbackPhone = item.contributor?.contact || item.contact || '';
             listerObj = {
-              _id: item.lister || item.user || item._id,
+              _id: item.createdBy || item.lister || item.user || item._id,
               name: fallbackName,
               email: fallbackEmail,
               phone: fallbackPhone,
@@ -209,6 +217,7 @@ const getAllListings = asyncHandler(async (req, res) => {
             ...item,
             lister: listerObj,
             contributor: contributorObj,
+            contributorId: listerObj._id || item.createdBy || item.lister,
             video: v,
             videoUrl: v,
             videos: Array.isArray(item.videos) && item.videos.length > 0 ? item.videos : (v ? [v] : []),
@@ -317,6 +326,7 @@ const getWebsiteUsers = asyncHandler(async (req, res) => {
   if (search) {
     const searchRegex = { $regex: search, $options: 'i' };
     const searchConditions = [
+      { name: searchRegex },
       { fullName: searchRegex },
       { email: searchRegex },
       { mobile: searchRegex },
@@ -343,20 +353,25 @@ const getWebsiteUsers = asyncHandler(async (req, res) => {
     User.countDocuments(filter),
   ]);
 
-  const formattedUsers = users.map((u) => ({
-    _id: u._id,
-    name: u.fullName || u.email?.split('@')[0] || 'User',
-    email: u.email || 'N/A',
-    phone: u.phoneNumber || u.mobile || u.phone || 'N/A',
-    avatar: u.avatar || u.profileImage || '',
-    city: u.city || '',
-    area: u.area || '',
-    role: u.role || 'user',
-    isEmailVerified: Boolean(u.isEmailVerified),
-    status: u.status || u.accountStatus || 'active',
-    lastLogin: u.lastLogin || null,
-    createdAt: u.createdAt,
-  }));
+  const formattedUsers = users.map((u) => {
+    const resolvedName = u.name || u.fullName || u.email?.split('@')[0] || 'User';
+    return {
+      _id: u._id,
+      name: resolvedName,
+      fullName: resolvedName,
+      email: u.email || 'N/A',
+      phone: u.phoneNumber || u.mobile || u.phone || 'N/A',
+      avatar: u.profileImage || u.avatar || '',
+      profileImage: u.profileImage || u.avatar || '',
+      city: u.city || '',
+      area: u.area || '',
+      role: u.role || 'user',
+      isEmailVerified: Boolean(u.isEmailVerified),
+      status: u.status || u.accountStatus || 'active',
+      lastLogin: u.lastLogin || null,
+      createdAt: u.createdAt,
+    };
+  });
 
   new ApiResponse(200, { users: formattedUsers, total, page: p, limit: l }, 'Website users fetched').send(res);
 });
@@ -374,7 +389,7 @@ const getListingDetail = asyncHandler(async (req, res) => {
     const fallbackCity = item.contributor?.city || item.city || '';
 
     item.lister = {
-      _id: item.lister || item.user || item._id,
+      _id: item.createdBy || item.lister || item.user || item._id,
       name: fallbackName,
       email: fallbackEmail,
       phone: fallbackPhone,
@@ -490,6 +505,18 @@ const approveListing = asyncHandler(async (req, res) => {
 
   item.status = 'approved';
   item.adminComment = undefined;
+
+  const email = (item.contributor?.email || item.contactEmail || item.email || '').toLowerCase();
+  const partner = (item.channelPartnerName || item.vendorName || '').toLowerCase().replace(/\s+/g, '');
+  if (email === 'ceo@onevishwam.com' || item.origin === 'in_house_project' || partner === 'onevishwam') {
+    item.priority = 1;
+    item.isPriority = true;
+    item.featured = true;
+    item.origin = 'in_house_project';
+    item.channelPartnerName = 'One Vishwam';
+    item.vendorName = 'One Vishwam';
+  }
+
   item.updatedAt = new Date();
   await item.save();
 
@@ -587,67 +614,123 @@ const getContributors = asyncHandler(async (req, res) => {
     listers = [];
   }
 
-  const listingContributorsMap = new Map();
+  const contributorsByEmail = new Map();
+  const contributorsById = new Map();
+
+  listers.forEach((l) => {
+    const norm = {
+      ...l,
+      _id: String(l._id),
+      id: String(l._id),
+      name: l.name || 'Contributor',
+      email: (l.email || '').trim().toLowerCase(),
+      phone: l.phone || l.listerId || '',
+      city: l.city || '',
+      type: l.role || 'lister',
+      createdAt: l.createdAt || new Date(),
+    };
+    if (norm._id) contributorsById.set(norm._id, norm);
+    if (norm.email) contributorsByEmail.set(norm.email, norm);
+  });
+
   await Promise.all(modules.map(async (mod) => {
     try {
       if (!mod || !mod.model) return;
-      const items = await mod.model.find({}, 'contributor lister user vendorName channelPartnerName status createdAt').lean();
+      const items = await mod.model.find({}, 'contributor createdBy lister user vendorName channelPartnerName status createdAt').lean();
       (items || []).forEach((item) => {
+        const idKey = String(item.createdBy || item.lister || item.user || '');
+        const emailKey = (item.contributor?.email || '').trim().toLowerCase();
+
+        if (idKey && contributorsById.has(idKey)) {
+          const existing = contributorsById.get(idKey);
+          if (!existing.phone && item.contributor?.contact) existing.phone = item.contributor.contact;
+          return;
+        }
+        if (emailKey && contributorsByEmail.has(emailKey)) {
+          const existing = contributorsByEmail.get(emailKey);
+          if (!existing.phone && item.contributor?.contact) existing.phone = item.contributor.contact;
+          return;
+        }
+
         if (item.contributor && (item.contributor.name || item.contributor.email)) {
-          const key = item.contributor.email || String(item.lister || item.user || item._id);
-          if (!listingContributorsMap.has(key)) {
-            listingContributorsMap.set(key, {
-              _id: item.lister || item.user || item._id,
-              name: item.contributor.name || item.channelPartnerName || item.vendorName || 'Contributor',
-              email: item.contributor.email || '',
-              phone: item.contributor.contact || '',
-              city: item.contributor.city || '',
-              type: item.contributor.type || 'lister',
-              createdAt: item.createdAt || new Date(),
-            });
-          }
+          const newContributor = {
+            _id: idKey || String(item._id),
+            id: idKey || String(item._id),
+            name: item.contributor.name || item.channelPartnerName || item.vendorName || 'Contributor',
+            email: emailKey,
+            phone: item.contributor.contact || item.contributor.phone || '',
+            city: item.contributor.city || '',
+            type: item.contributor.type || 'lister',
+            createdAt: item.createdAt || new Date(),
+          };
+          if (idKey) contributorsById.set(idKey, newContributor);
+          if (emailKey) contributorsByEmail.set(emailKey, newContributor);
         }
       });
     } catch {}
   }));
 
-  const map = new Map();
-  listers.forEach((l) => map.set(String(l._id || l.email), l));
-  listingContributorsMap.forEach((c, key) => {
-    if (!map.has(key)) map.set(key, c);
-  });
+  const seenIdentities = new Set();
+  const allContributors = [];
+  const candidateList = [...contributorsById.values(), ...contributorsByEmail.values()];
 
-  const allContributors = Array.from(map.values());
+  candidateList.forEach((c) => {
+    const key = (c.email || String(c._id || '')).toLowerCase();
+    if (!key || seenIdentities.has(key)) return;
+    seenIdentities.add(key);
+    allContributors.push(c);
+  });
 
   const enriched = await Promise.all(allContributors.map(async (lister) => {
     let totalListings = 0;
     let pendingCount = 0;
     let approvedCount = 0;
 
-    await Promise.all(modules.map(async (mod) => {
-      try {
-        if (!mod || !mod.model) return;
-        const filterOr = [
-          lister._id ? { lister: lister._id } : null,
-          lister._id ? { user: lister._id } : null,
-          lister.email ? { 'contributor.email': lister.email } : null,
-        ].filter(Boolean);
+    const orFilters = [];
+    if (lister._id && mongoose.Types.ObjectId.isValid(lister._id)) {
+      const objId = new mongoose.Types.ObjectId(lister._id);
+      orFilters.push(
+        { createdBy: objId },
+        { createdBy: String(objId) },
+        { lister: objId },
+        { lister: String(objId) },
+        { user: objId },
+        { user: String(objId) }
+      );
+    }
+    if (lister.email) {
+      orFilters.push({ 'contributor.email': lister.email });
+      orFilters.push({ 'contributor.email': lister.email.toLowerCase() });
+    }
+    if (lister.phone) {
+      orFilters.push({ 'contributor.phone': lister.phone });
+      orFilters.push({ 'contributor.contact': lister.phone });
+    }
+    if (lister.listerId) {
+      orFilters.push({ listerId: lister.listerId });
+      orFilters.push({ 'contributor.listerId': lister.listerId });
+    }
 
-        if (filterOr.length === 0) return;
-
-        const [total, pending, approved] = await Promise.all([
-          mod.model.countDocuments({ $or: filterOr }),
-          mod.model.countDocuments({ status: 'pending', $or: filterOr }),
-          mod.model.countDocuments({ status: 'approved', $or: filterOr }),
-        ]);
-        totalListings += total || 0;
-        pendingCount += pending || 0;
-        approvedCount += approved || 0;
-      } catch {}
-    }));
+    if (orFilters.length > 0) {
+      await Promise.all(modules.map(async (mod) => {
+        try {
+          if (!mod || !mod.model) return;
+          const [total, pending, approved] = await Promise.all([
+            mod.model.countDocuments({ $or: orFilters }),
+            mod.model.countDocuments({ status: 'pending', $or: orFilters }),
+            mod.model.countDocuments({ status: 'approved', $or: orFilters }),
+          ]);
+          totalListings += total || 0;
+          pendingCount += pending || 0;
+          approvedCount += approved || 0;
+        } catch {}
+      }));
+    }
 
     return {
       ...lister,
+      contact: lister.phone || lister.contact || '',
+      phone: lister.phone || lister.contact || '',
       totalListings,
       pendingCount,
       approvedCount,
@@ -661,30 +744,76 @@ const getContributorById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   let lister = null;
   try {
-    lister = await Lister.findById(id).lean();
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      lister = await Lister.findById(id).lean();
+    }
+    if (!lister) {
+      lister = await Lister.findOne({ $or: [{ email: id }, { listerId: id }] }).lean();
+    }
   } catch {}
+
+  const orFilters = [];
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    const objId = new mongoose.Types.ObjectId(id);
+    orFilters.push(
+      { createdBy: objId },
+      { createdBy: String(objId) },
+      { lister: objId },
+      { lister: String(objId) },
+      { user: objId },
+      { user: String(objId) }
+    );
+  }
+  if (lister?._id && mongoose.Types.ObjectId.isValid(lister._id)) {
+    const objId = new mongoose.Types.ObjectId(lister._id);
+    orFilters.push(
+      { createdBy: objId },
+      { createdBy: String(objId) },
+      { lister: objId },
+      { lister: String(objId) }
+    );
+  }
+  if (lister?.email) {
+    orFilters.push({ 'contributor.email': lister.email }, { 'contributor.email': lister.email.toLowerCase() });
+  } else if (id && id.includes('@')) {
+    orFilters.push({ 'contributor.email': id }, { 'contributor.email': id.toLowerCase() });
+  }
+  if (lister?.phone) {
+    orFilters.push({ 'contributor.phone': lister.phone }, { 'contributor.contact': lister.phone });
+  }
+  if (lister?.listerId) {
+    orFilters.push({ listerId: lister.listerId }, { 'contributor.listerId': lister.listerId });
+  }
 
   const listings = {};
   let totalListings = 0;
 
-  await Promise.all(modules.map(async (mod) => {
-    try {
-      if (!mod || !mod.model) return;
-      const items = await mod.model.find({ $or: [{ lister: id }, { user: id }] }).sort({ createdAt: -1 }).lean();
-      if (items && items.length > 0) {
-        listings[mod.id] = items;
-        totalListings += items.length;
-      }
-    } catch {}
-  }));
+  if (orFilters.length > 0) {
+    await Promise.all(modules.map(async (mod) => {
+      try {
+        if (!mod || !mod.model) return;
+        const items = await mod.model.find({ $or: orFilters }).sort({ createdAt: -1 }).lean();
+        if (items && items.length > 0) {
+          listings[mod.id] = items;
+          totalListings += items.length;
+        }
+      } catch {}
+    }));
+  }
 
   if (!lister) {
-    // Construct synthetic contributor profile from listing data if not in Lister model
     lister = {
       _id: id,
       name: 'Contributor',
-      email: '',
+      email: id.includes('@') ? id : '',
       phone: '',
+      contact: '',
+    };
+  } else {
+    lister = {
+      ...lister,
+      contact: lister.phone || lister.contact || '',
+      phone: lister.phone || lister.contact || '',
     };
   }
 

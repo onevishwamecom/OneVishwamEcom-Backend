@@ -12,10 +12,14 @@ const userSchema = new mongoose.Schema(
       sparse: true,
       index: true,
     },
-    fullName: {
+    name: {
       type: String,
       trim: true,
       default: 'User',
+    },
+    fullName: {
+      type: String,
+      trim: true,
     },
     email: {
       type: String,
@@ -27,18 +31,6 @@ const userSchema = new mongoose.Schema(
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
     },
     phoneNumber: {
-      type: String,
-      trim: true,
-    },
-    mobile: {
-      type: String,
-      required: false,
-      unique: true,
-      sparse: true,
-      trim: true,
-      match: [/^\+?[\d\s-]{10,15}$/, 'Please provide a valid mobile number'],
-    },
-    phone: {
       type: String,
       trim: true,
       unique: true,
@@ -96,10 +88,31 @@ const userSchema = new mongoose.Schema(
       whatsapp: { type: Boolean, default: false },
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
 
+userSchema.virtual('mobile').get(function () {
+  return this.phoneNumber || '';
+});
+
+userSchema.virtual('phone').get(function () {
+  return this.phoneNumber || '';
+});
+
 userSchema.pre('save', async function (next) {
+  if (!this.name && this.fullName) {
+    this.name = this.fullName;
+  }
+  if (!this.fullName && this.name) {
+    this.fullName = this.name;
+  }
+  if (!this.phoneNumber && (this.mobile || this.phone)) {
+    this.phoneNumber = this.mobile || this.phone;
+  }
   if (!this.password || !this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
   this.password = await bcrypt.hash(this.password, salt);
@@ -126,12 +139,13 @@ userSchema.methods.generateRefreshToken = function () {
 };
 
 userSchema.methods.toProfileJSON = function () {
+  const resolvedName = this.name || this.fullName || 'User';
   return {
     id: this._id,
     firebaseUid: this.firebaseUid,
     accountType: this.role === 'lister' ? 'lister' : this.role === 'admin' ? 'admin' : 'user',
-    fullName: this.fullName,
-    name: this.fullName,
+    name: resolvedName,
+    fullName: resolvedName,
     email: this.email,
     phoneNumber: this.phoneNumber || this.mobile || this.phone || '',
     mobile: this.mobile || this.phoneNumber || '',
@@ -157,13 +171,14 @@ userSchema.methods.toProfileJSON = function () {
 };
 
 userSchema.methods.toListerJSON = function () {
+  const resolvedName = this.name || this.fullName || 'User';
   return {
     id: this._id,
     firebaseUid: this.firebaseUid,
     accountType: 'lister',
     listerId: this.listerId || null,
-    name: this.fullName,
-    fullName: this.fullName,
+    name: resolvedName,
+    fullName: resolvedName,
     email: this.email,
     phone: this.phone || this.phoneNumber || this.mobile || null,
     phoneNumber: this.phoneNumber || this.phone || this.mobile || '',

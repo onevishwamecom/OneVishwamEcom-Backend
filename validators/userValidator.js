@@ -2,6 +2,9 @@ const { body } = require('express-validator');
 const { NAME_MIN_LENGTH, NAME_MAX_LENGTH, PHONE_REGEX } = require('../config/authConfig');
 
 const updateProfileRules = [
+  body('name').optional().trim()
+    .isLength({ min: NAME_MIN_LENGTH, max: NAME_MAX_LENGTH })
+    .withMessage(`Name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`),
   body('fullName').optional().trim()
     .isLength({ min: NAME_MIN_LENGTH, max: NAME_MAX_LENGTH })
     .withMessage(`Name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`),

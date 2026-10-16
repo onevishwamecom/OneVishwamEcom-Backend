@@ -21,14 +21,15 @@ const getAuthenticatedAccount = async ({ id, accountType }) => {
   return accountType === 'lister' ? doc.toListerJSON() : doc.toProfileJSON();
 };
 
-const register = async ({ fullName, email, mobile, password }) => {
+const register = async ({ name, fullName, email, mobile, password }) => {
   const existingEmail = await User.findOne({ email: email.toLowerCase() });
   if (existingEmail) throw new ApiError(409, 'Email already registered');
 
   const existingMobile = await User.findOne({ mobile });
   if (existingMobile) throw new ApiError(409, 'Mobile number already registered');
 
-  const user = await User.create({ fullName, email, mobile, password });
+  const resolvedName = (name || fullName || '').trim() || 'User';
+  const user = await User.create({ name: resolvedName, fullName: resolvedName, email, mobile, password });
   return user.generateAuthResponse();
 };
 
@@ -152,10 +153,15 @@ const logout = async ({ refreshToken }) => {
 };
 
 const updateProfile = async (userId, updates) => {
-  const allowed = ['fullName', 'mobile', 'city', 'area', 'pincode'];
+  const allowed = ['name', 'fullName', 'mobile', 'city', 'area', 'pincode'];
   const data = {};
   for (const key of allowed) {
     if (updates[key] !== undefined) data[key] = updates[key];
+  }
+  if (data.name !== undefined) {
+    data.fullName = data.name;
+  } else if (data.fullName !== undefined) {
+    data.name = data.fullName;
   }
   if (updates.profileImage !== undefined) data.profileImage = updates.profileImage;
 

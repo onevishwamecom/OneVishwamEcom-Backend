@@ -16,9 +16,15 @@ const passwordField = (field = 'password') =>
     .matches(PASSWORD_REGEX).withMessage(PASSWORD_RULES_MESSAGE);
 
 const registerRules = [
-  body('fullName').trim().notEmpty().withMessage('Full name is required')
-    .isLength({ min: NAME_MIN_LENGTH, max: NAME_MAX_LENGTH })
-    .withMessage(`Name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`),
+  body('name')
+    .custom((val, { req }) => {
+      const n = (req.body.name || req.body.fullName || '').trim();
+      if (!n) throw new Error('Name is required');
+      if (n.length < NAME_MIN_LENGTH || n.length > NAME_MAX_LENGTH) {
+        throw new Error(`Name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`);
+      }
+      return true;
+    }),
   emailField(),
   body('mobile').trim().notEmpty().withMessage('Mobile number is required')
     .matches(PHONE_REGEX).withMessage('Invalid mobile number'),
@@ -52,6 +58,9 @@ const resetPasswordRules = [
 ];
 
 const updateProfileRules = [
+  body('name').optional().trim()
+    .isLength({ min: NAME_MIN_LENGTH, max: NAME_MAX_LENGTH })
+    .withMessage(`Name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`),
   body('fullName').optional().trim()
     .isLength({ min: NAME_MIN_LENGTH, max: NAME_MAX_LENGTH })
     .withMessage(`Name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`),

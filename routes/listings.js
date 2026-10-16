@@ -64,8 +64,8 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   const isValidObjectId = (val) => val && mongoose.Types.ObjectId.isValid(String(val));
 
   const filterOr = [];
-  if (isValidObjectId(req.auth?.id)) filterOr.push({ lister: req.auth.id }, { user: req.auth.id });
-  if (isValidObjectId(req.user?._id)) filterOr.push({ lister: req.user._id }, { user: req.user._id });
+  if (isValidObjectId(req.auth?.id)) filterOr.push({ createdBy: req.auth.id }, { lister: req.auth.id }, { user: req.auth.id });
+  if (isValidObjectId(req.user?._id)) filterOr.push({ createdBy: req.user._id }, { lister: req.user._id }, { user: req.user._id });
   const listerIdVal = req.auth?.listerId || req.user?.listerId;
   if (listerIdVal) filterOr.push({ listerId: listerIdVal }, { lister_id: listerIdVal }, { 'details.listerId': listerIdVal });
   if (req.user?.phone) filterOr.push({ listerId: req.user.phone }, { lister_id: req.user.phone });
@@ -120,8 +120,6 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     ? req.auth.id
     : (isValidObjectId(req.user?._id) ? req.user._id : new mongoose.Types.ObjectId());
 
-  data.user = ownerId;
-  data.lister = ownerId;
   data.createdBy = ownerId;
 
   // Server-side automatic identity resolution for One Vishwam vs External Listers
@@ -132,17 +130,20 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     data.channelPartnerName = 'One Vishwam';
     data.vendorName = 'One Vishwam';
     data.origin = 'in_house_project';
+    data.priority = 1;
+    data.isPriority = true;
+    data.featured = true;
   } else {
-    data.channelPartnerName = data.channelPartnerName || req.user?.partnerName || req.auth?.partnerName || req.user?.fullName || req.user?.name || req.auth?.name || 'External Partner';
-    data.vendorName = data.vendorName || req.user?.fullName || req.user?.name || req.auth?.name || req.user?.partnerName || req.auth?.partnerName || 'Independent Owner';
+    data.channelPartnerName = data.channelPartnerName || req.user?.partnerName || req.auth?.partnerName || req.user?.name || req.user?.fullName || req.auth?.name || 'External Partner';
+    data.vendorName = data.vendorName || req.user?.name || req.user?.fullName || req.auth?.name || req.user?.partnerName || req.auth?.partnerName || 'Independent Owner';
     data.origin = req.user?.origin || req.auth?.origin || 'channel_partner_project';
   }
 
   data.bankLoanDetails = data.bankLoanDetails || 'Available on request';
 
   const contributorName =
-    req.user?.fullName ||
     req.user?.name ||
+    req.user?.fullName ||
     req.auth?.name ||
     body.contributor?.name ||
     data.vendorName ||
@@ -165,9 +166,16 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     createdAt: new Date(),
   };
 
+  // Clean redundant root fields from details if present
   if (data.details && typeof data.details === 'object') {
-    data.details.channelPartnerName = data.channelPartnerName;
-    data.details.vendorName = data.vendorName;
+    delete data.details.channelPartnerName;
+    delete data.details.vendorName;
+    delete data.details.propertyName;
+    delete data.details.expectedPrice;
+    delete data.details.description;
+    delete data.details.listerId;
+    delete data.details.possessionStatus;
+    delete data.details.negotiable;
   }
 
   const item = await mod.model.create(data);
@@ -231,11 +239,16 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   const wasCancelled = item.status === 'cancelled' || item.status === 'rejected';
   Object.assign(item, body);
 
-  // If user/lister edits a changes-required, cancelled, or approved listing, it goes back to pending for re-approval
-  if (req.auth.role !== 'admin' && (item.status === 'changes-required' || wasCancelled || wasApproved)) {
-    item.status = 'pending';
-    // Clear any previous admin comment when resubmitting
-    item.adminComment = undefined;
+  // Enforce priority for in-house / ceo@onevishwam.com listings
+  const userEmail = (req.user?.email || req.auth?.email || '').toLowerCase();
+  const isOneVishwamUser = userEmail === 'ceo@onevishwam.com' || userEmail.endsWith('@onevishwam.com') || req.user?.role === 'in_house' || req.auth?.role === 'in_house';
+  if (isOneVishwamUser || item.origin === 'in_house_project') {
+    item.priority = 1;
+    item.isPriority = true;
+    item.featured = true;
+    item.origin = 'in_house_project';
+    item.channelPartnerName = 'One Vishwam';
+    item.vendorName = 'One Vishwam';
   }
 
   await item.save();

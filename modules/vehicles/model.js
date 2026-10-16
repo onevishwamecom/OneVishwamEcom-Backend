@@ -49,8 +49,7 @@ const vehicleSchema = new mongoose.Schema({
   listedBy: { type: String, enum: ['Owner', 'Dealer', 'Showroom'] },
   listedDate: { type: Date, default: Date.now },
   views: { type: Number, default: 0, index: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
-  lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
   availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
 }, {
   timestamps: true,
@@ -62,10 +61,23 @@ const vehicleSchema = new mongoose.Schema({
       ret.video = v;
       ret.videoUrl = v;
       ret.videos = Array.isArray(ret.videos) && ret.videos.length > 0 ? ret.videos : (v ? [v] : []);
+      ret.lister = ret.lister || ret.createdBy;
+      ret.user = ret.createdBy;
       return ret;
     },
   },
   toObject: { virtuals: true },
+});
+
+vehicleSchema.virtual('lister', {
+  ref: 'Lister',
+  localField: 'createdBy',
+  foreignField: '_id',
+  justOne: true,
+});
+
+vehicleSchema.virtual('user').get(function () {
+  return this.createdBy;
 });
 
 vehicleSchema.index({ brand: 1, model: 1 });

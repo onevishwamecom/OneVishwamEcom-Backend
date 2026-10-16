@@ -61,7 +61,7 @@ const refreshLimiter = rateLimit({
 // Mandatory sync route - writes & updates authoritative copy in MongoDB Atlas
 router.post('/sync', verifyFirebaseToken, async (req, res) => {
   try {
-    const { fullName, phoneNumber, mobile, role, avatar, city, area, pincode, firebaseUid: bodyUid, email: bodyEmail } = req.body;
+    const { name, fullName, phoneNumber, mobile, role, avatar, profileImage, city, area, pincode, firebaseUid: bodyUid, email: bodyEmail } = req.body;
     const uid = req.firebaseClaims?.uid || req.user?.firebaseUid || (process.env.NODE_ENV !== 'production' ? bodyUid : null);
     const email = req.firebaseClaims?.email || req.user?.email || (process.env.NODE_ENV !== 'production' ? bodyEmail : null);
 
@@ -87,7 +87,7 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
     const isLister = role === 'lister' || Boolean(existingLister) || req.auth?.accountType === 'lister' || req.user?.role === 'lister';
 
     if (isLister) {
-      const bodyName = (fullName || req.body.name)?.trim();
+      const bodyName = (name || fullName || req.body.displayName)?.trim();
       const displayName = bodyName || req.user?.name || req.user?.fullName || (cleanEmail ? cleanEmail.split('@')[0] : 'Lister');
 
       // Clean up any accidental duplicate in User collection (users)
@@ -110,10 +110,8 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
         if (cleanEmail) lister.email = cleanEmail;
         if (bodyName) {
           lister.name = bodyName;
-          lister.fullName = bodyName;
         } else if (!lister.name || lister.name.includes('.')) {
           lister.name = displayName;
-          lister.fullName = displayName;
         }
         if (cleanPhone) lister.phone = cleanPhone;
         if (city) lister.city = city;
@@ -129,7 +127,6 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
           listerId: cleanPhone || uid,
           firebaseUid: uid,
           name: displayName,
-          fullName: displayName,
           email: cleanEmail,
           phone: cleanPhone,
           city: city || '',
@@ -149,13 +146,15 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       });
     }
 
+    const resolvedName = (name || fullName || req.body.displayName)?.trim();
+    const resolvedImage = profileImage || avatar;
     const updateFields = {
       firebaseUid: uid,
       ...(email && { email: email.toLowerCase().trim() }),
-      ...(fullName && { fullName: fullName.trim() }),
+      ...(resolvedName && { name: resolvedName, fullName: resolvedName }),
       ...(phone && { phoneNumber: phone.trim(), mobile: phone.trim() }),
       ...(role && ['user', 'lister'].includes(role) && { role }),
-      ...(avatar && { avatar, profileImage: avatar }),
+      ...(resolvedImage && { avatar: resolvedImage, profileImage: resolvedImage }),
       ...(city && { city }),
       ...(area && { area }),
       ...(pincode && { pincode }),

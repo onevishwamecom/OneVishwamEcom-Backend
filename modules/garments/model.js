@@ -23,11 +23,33 @@ const garmentSchema = new mongoose.Schema({
   brand: { type: String, trim: true },
   gender: { type: String, enum: ['male', 'female', 'unisex'], default: 'unisex' },
   quantity: { type: Number, default: 1, min: 0 },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  lister: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
   availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
   status: { type: String, enum: ['available', 'sold', 'out-of-stock', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'available', index: true },
-}, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
+}, {
+  timestamps: true,
+  toJSON: {
+    virtuals: true,
+    transform: (doc, ret) => {
+      delete ret.__v;
+      ret.lister = ret.lister || ret.createdBy;
+      ret.user = ret.createdBy;
+      return ret;
+    },
+  },
+  toObject: { virtuals: true },
+});
+
+garmentSchema.virtual('lister', {
+  ref: 'Lister',
+  localField: 'createdBy',
+  foreignField: '_id',
+  justOne: true,
+});
+
+garmentSchema.virtual('user').get(function () {
+  return this.createdBy;
+});
 
 garmentSchema.index({ category: 1, subcategory: 1 });
 garmentSchema.index({ createdAt: -1 });

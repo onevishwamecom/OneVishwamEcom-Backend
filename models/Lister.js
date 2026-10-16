@@ -26,10 +26,6 @@ const listerSchema = new mongoose.Schema(
       minlength: [2, 'Name must be at least 2 characters'],
       maxlength: [50, 'Name cannot exceed 50 characters'],
     },
-    fullName: {
-      type: String,
-      trim: true,
-    },
     email: {
       type: String,
       required: false,
@@ -125,7 +121,6 @@ listerSchema.methods.toListerJSON = function () {
     accountType: 'lister',
     listerId: this.listerId,
     name: this.name,
-    fullName: this.name,
     email: this.email || null,
     phone: this.phone,
     mobile: this.phone,

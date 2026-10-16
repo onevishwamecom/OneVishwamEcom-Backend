@@ -146,11 +146,13 @@ async function processFirebaseUser(decodedToken, req, next, isDevUnverified = fa
   const fallbackRole = partnerInfo && partnerInfo.isLocked ? partnerInfo.role : 'user';
   const resolvedRole = (isAdminEmail && !isDevUnverified) ? 'admin' : fallbackRole;
 
+  const fallbackName = decodedToken.name || (email ? email.split('@')[0] : 'User');
   req.user = {
     _id: uid,
     firebaseUid: uid,
     email,
-    fullName: decodedToken.name || (email ? email.split('@')[0] : 'User'),
+    name: fallbackName,
+    fullName: fallbackName,
     role: resolvedRole,
   };
   req.auth = {
