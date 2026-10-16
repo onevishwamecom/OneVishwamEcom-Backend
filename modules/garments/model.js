@@ -26,6 +26,10 @@ const garmentSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Lister', index: true },
   availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
   status: { type: String, enum: ['available', 'sold', 'out-of-stock', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'available', index: true },
+  isBulkListing: { type: Boolean, default: false, index: true },
+  bulkBatchId: { type: String, trim: true, index: true },
+  bulkFilename: { type: String, trim: true },
+  bulkUploadedAt: { type: Date },
 }, {
   timestamps: true,
   toJSON: {

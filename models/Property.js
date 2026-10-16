@@ -267,6 +267,10 @@ const propertySchema = new mongoose.Schema(
       type: { type: String, default: 'Channel Partner' },
       avatar: { type: String, default: '' },
     },
+    isBulkListing: { type: Boolean, default: false, index: true },
+    bulkBatchId: { type: String, trim: true, index: true },
+    bulkFilename: { type: String, trim: true },
+    bulkUploadedAt: { type: Date },
   },
   {
     timestamps: true,

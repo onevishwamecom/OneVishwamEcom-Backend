@@ -42,6 +42,10 @@ const jewellerySchema = new mongoose.Schema({
   availabilityStatus: { type: String, enum: ['available', 'sold_out', 'inactive'], default: 'available', index: true },
   status: { type: String, enum: ['active', 'inactive', 'sold', 'pending', 'approved', 'changes-required', 'cancelled'], default: 'active', index: true },
   featured: { type: Boolean, default: false, index: true },
+  isBulkListing: { type: Boolean, default: false, index: true },
+  bulkBatchId: { type: String, trim: true, index: true },
+  bulkFilename: { type: String, trim: true },
+  bulkUploadedAt: { type: Date },
 }, {
   timestamps: true,
   toJSON: {
