@@ -99,6 +99,11 @@ router.get('/', protect, asyncHandler(async (req, res) => {
   new ApiResponse(200, grouped, 'Listings fetched').send(res);
 }));
 
+const { bulkUploadListings } = require('../controllers/bulkListingController');
+
+// POST /api/listings/bulk-upload — bulk upload listings via Excel file
+router.post('/bulk-upload', protect, bulkUploadListings);
+
 // POST /api/listings  — create a listing owned by the authenticated account.
 router.post('/', protect, asyncHandler(async (req, res) => {
   const type = req.body._type || CATEGORY_TO_MODULE[req.body.category] || req.body.category || 'properties';
