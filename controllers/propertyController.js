@@ -158,13 +158,37 @@ const getProperties = asyncHandler(async (req, res) => {
     Property.countDocuments(filter),
   ]);
 
+  const formatResolvedLocation = (p) => {
+    const address = (p.address || '').trim();
+    const locality = (p.locality || p.details?.locality || '').trim();
+    const city = (p.city || p.details?.city || '').trim();
+    const isAddressJustCity = address && city && address.toLowerCase() === city.toLowerCase();
+
+    let resolvedLocation = address;
+    if (!resolvedLocation || isAddressJustCity) {
+      resolvedLocation = [locality, address || city].filter(Boolean).join(', ');
+    } else if (locality && !resolvedLocation.toLowerCase().includes(locality.toLowerCase())) {
+      resolvedLocation = `${locality}, ${resolvedLocation}`;
+    }
+    return resolvedLocation || address || city || '';
+  };
+
+  const formattedProperties = properties.map((p) => {
+    const loc = formatResolvedLocation(p);
+    return {
+      ...p,
+      location: loc,
+      address: p.address || loc,
+    };
+  });
+
   const totalPages = Math.ceil(total / limit) || 1;
 
   new ApiResponse(
     200,
     {
-      properties,
-      items: properties,
+      properties: formattedProperties,
+      items: formattedProperties,
       total,
       totalPages,
       page,
@@ -188,7 +212,23 @@ const getPropertyById = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Property listing not found');
   }
 
-  new ApiResponse(200, { property, item: property }, 'Property fetched successfully').send(res);
+  const pObj = property.toObject ? property.toObject({ virtuals: true }) : property;
+  const address = (pObj.address || '').trim();
+  const locality = (pObj.locality || pObj.details?.locality || '').trim();
+  const city = (pObj.city || pObj.details?.city || '').trim();
+  const isAddressJustCity = address && city && address.toLowerCase() === city.toLowerCase();
+
+  let resolvedLocation = address;
+  if (!resolvedLocation || isAddressJustCity) {
+    resolvedLocation = [locality, address || city].filter(Boolean).join(', ');
+  } else if (locality && !resolvedLocation.toLowerCase().includes(locality.toLowerCase())) {
+    resolvedLocation = `${locality}, ${resolvedLocation}`;
+  }
+
+  pObj.location = resolvedLocation || pObj.address || pObj.city || '';
+  if (!pObj.address) pObj.address = pObj.location;
+
+  new ApiResponse(200, { property: pObj, item: pObj }, 'Property fetched successfully').send(res);
 });
 
 // @desc    Update property listing status (Admin only)

@@ -293,12 +293,19 @@ const getListingStats = asyncHandler(async (req, res) => {
 
 const getWebsiteUserStats = asyncHandler(async (req, res) => {
   const userRoleFilter = { role: { $ne: 'admin' } };
-  const [totalUsers, loggedInUsers, activeUsers, emailVerifiedUsers] = await Promise.all([
+  const [totalUsers, loggedInUsers, activeUsers, emailVerifiedUsers, durationAgg] = await Promise.all([
     User.countDocuments(userRoleFilter),
     User.countDocuments({ ...userRoleFilter, lastLogin: { $exists: true, $ne: null } }),
     User.countDocuments({ ...userRoleFilter, $or: [{ status: 'active' }, { accountStatus: 'active' }] }),
     User.countDocuments({ ...userRoleFilter, isEmailVerified: true }),
+    User.aggregate([
+      { $match: userRoleFilter },
+      { $group: { _id: null, totalSeconds: { $sum: '$totalTimeSpent' }, avgSeconds: { $avg: '$totalTimeSpent' } } },
+    ]).catch(() => []),
   ]);
+
+  const totalTimeSpentSeconds = durationAgg[0]?.totalSeconds || 0;
+  const avgTimeSpentSeconds = Math.round(durationAgg[0]?.avgSeconds || 0);
 
   new ApiResponse(
     200,
@@ -307,6 +314,8 @@ const getWebsiteUserStats = asyncHandler(async (req, res) => {
       loggedInUsers,
       activeUsers,
       emailVerifiedUsers,
+      totalTimeSpentSeconds,
+      avgTimeSpentSeconds,
     },
     'Website user stats fetched successfully'
   ).send(res);
@@ -369,6 +378,10 @@ const getWebsiteUsers = asyncHandler(async (req, res) => {
       isEmailVerified: Boolean(u.isEmailVerified),
       status: u.status || u.accountStatus || 'active',
       lastLogin: u.lastLogin || null,
+      lastActiveAt: u.lastActiveAt || u.updatedAt || u.lastLogin || null,
+      totalTimeSpent: u.totalTimeSpent || 0,
+      sessionDuration: u.sessionDuration || 0,
+      loginCount: u.loginCount || (u.lastLogin ? 1 : 0),
       createdAt: u.createdAt,
     };
   });

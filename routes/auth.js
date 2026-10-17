@@ -148,6 +148,7 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
 
     const resolvedName = (name || fullName || req.body.displayName)?.trim();
     const resolvedImage = profileImage || avatar;
+    const now = new Date();
     const updateFields = {
       firebaseUid: uid,
       ...(email && { email: email.toLowerCase().trim() }),
@@ -160,11 +161,16 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       ...(pincode && { pincode }),
       status: 'active',
       accountStatus: 'active',
+      lastLogin: now,
+      lastActiveAt: now,
     };
 
     const user = await User.findOneAndUpdate(
       { firebaseUid: uid },
-      { $set: updateFields },
+      {
+        $set: updateFields,
+        $inc: { loginCount: 1 },
+      },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
@@ -182,6 +188,41 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       message: 'Failed to persist user in database',
       error: error.message,
     });
+  }
+});
+
+// Activity Heartbeat endpoint to track user session & time spent on site
+router.post('/heartbeat', verifyFirebaseToken, async (req, res) => {
+  try {
+    const uid = req.firebaseClaims?.uid || req.user?.firebaseUid;
+    const { seconds = 30 } = req.body;
+    // Cap seconds per ping between 1 and 120s to ensure realistic tracking
+    const validSeconds = Math.min(120, Math.max(1, Number(seconds) || 30));
+
+    if (!uid) {
+      return res.status(200).json({ success: true, message: 'Ignored unauthenticated heartbeat' });
+    }
+
+    const now = new Date();
+    const user = await User.findOneAndUpdate(
+      { firebaseUid: uid },
+      {
+        $inc: { totalTimeSpent: validSeconds, sessionDuration: validSeconds },
+        $set: { lastActiveAt: now },
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalTimeSpent: user?.totalTimeSpent || 0,
+        sessionDuration: user?.sessionDuration || 0,
+        lastActiveAt: user?.lastActiveAt || now,
+      },
+    });
+  } catch (err) {
+    return res.status(200).json({ success: false, message: err.message });
   }
 });
 
