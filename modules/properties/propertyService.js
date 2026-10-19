@@ -110,7 +110,7 @@ const getAll = async (query) => {
 
 const getById = async (id) => {
   const property = await Property.findOneAndUpdate(
-    { _id: id, status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out'] } },
+    { _id: id, status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out', null] } },
     { $inc: { viewsCount: 1 } },
     { new: true }
   );
@@ -119,7 +119,7 @@ const getById = async (id) => {
 };
 
 const getFeatured = async () => {
-  const items = await Property.find({ featured: true, status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out'] } })
+  const items = await Property.find({ featured: true, status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out', null] } })
     .sort({ priority: -1, createdAt: -1 })
     .limit(6)
     .lean();
@@ -128,7 +128,7 @@ const getFeatured = async () => {
 
 const getLatest = async (limit = 6) => {
   const l = Math.min(20, Number(limit));
-  const items = await Property.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out'] } })
+  const items = await Property.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out', null] } })
     .sort({ priority: -1, createdAt: -1 })
     .limit(l)
     .lean();

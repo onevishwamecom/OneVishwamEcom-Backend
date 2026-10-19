@@ -1,7 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const validate = require('../middleware/validate');
-const { protect, verifyFirebaseToken } = require('../middleware/auth');
+const { protect, verifyFirebaseToken, optionalAuth } = require('../middleware/auth');
 const User = require('../models/User');
 const Lister = require('../models/Lister');
 const ApiResponse = require('../utils/ApiResponse');
@@ -192,7 +192,7 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
 });
 
 // Activity Heartbeat endpoint to track user session & time spent on site
-router.post('/heartbeat', verifyFirebaseToken, async (req, res) => {
+router.post('/heartbeat', optionalAuth, async (req, res) => {
   try {
     const uid = req.firebaseClaims?.uid || req.user?.firebaseUid;
     const { seconds = 30 } = req.body;

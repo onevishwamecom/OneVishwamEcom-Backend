@@ -125,6 +125,14 @@ const propertyDetailsSchema = new mongoose.Schema(
     // Common commercial/financial terms across categories
     expectedPrice: { type: String, trim: true },
     negotiable: { type: String, trim: true },
+
+    // Location URL (Google Maps)
+    locationUrl: { type: String, trim: true },
+    googleMapsUrl: { type: String, trim: true },
+    googleMapUrl: { type: String, trim: true },
+    mapUrl: { type: String, trim: true },
+    mapEmbedUrl: { type: String, trim: true },
+    resolvedLocationUrl: { type: String, trim: true },
   },
   { _id: false, strict: false }
 );
@@ -250,6 +258,12 @@ const propertySchema = new mongoose.Schema(
     pincode: { type: String, trim: true, default: '' },
     address: { type: String, trim: true, default: '' },
     landmark: { type: String, trim: true, default: '' },
+    locationUrl: { type: String, trim: true, default: '' },
+    googleMapsUrl: { type: String, trim: true, default: '' },
+    googleMapUrl: { type: String, trim: true, default: '' },
+    mapUrl: { type: String, trim: true, default: '' },
+    mapEmbedUrl: { type: String, trim: true, default: '' },
+    resolvedLocationUrl: { type: String, trim: true, default: '' },
     contact: { type: String, trim: true, default: '' },
     contactEmail: { type: String, trim: true, default: '' },
     featured: { type: Boolean, default: false, index: true },
@@ -318,6 +332,42 @@ const propertySchema = new mongoose.Schema(
         if (!ret.details.vendorName) ret.details.vendorName = ret.vendorName;
         if (!ret.details.channelPartnerName) ret.details.channelPartnerName = ret.channelPartnerName;
 
+        const locUrl = (
+          ret.locationUrl ||
+          ret.googleMapsUrl ||
+          ret.googleMapUrl ||
+          ret.mapUrl ||
+          ret.mapsUrl ||
+          ret['Google Map URL'] ||
+          ret['Location URL'] ||
+          ret['Map URL'] ||
+          ret.details?.locationUrl ||
+          ret.details?.googleMapsUrl ||
+          ret.details?.googleMapUrl ||
+          ret.details?.mapUrl ||
+          ret.details?.mapsUrl ||
+          ret.details?.['Google Map URL'] ||
+          ret.details?.['Location URL'] ||
+          ret.details?.['Map URL'] ||
+          ''
+        ).trim();
+
+        ret.locationUrl = locUrl;
+        ret.googleMapsUrl = locUrl;
+        ret.googleMapUrl = locUrl;
+        ret.mapUrl = locUrl;
+        ret.mapEmbedUrl = ret.mapEmbedUrl || ret.details?.mapEmbedUrl || '';
+        ret.resolvedLocationUrl = ret.resolvedLocationUrl || ret.details?.resolvedLocationUrl || '';
+
+        if (ret.details) {
+          ret.details.locationUrl = locUrl;
+          ret.details.googleMapsUrl = locUrl;
+          ret.details.googleMapUrl = locUrl;
+          ret.details.mapUrl = locUrl;
+          ret.details.mapEmbedUrl = ret.mapEmbedUrl;
+          ret.details.resolvedLocationUrl = ret.resolvedLocationUrl;
+        }
+
         return ret;
       },
     },
@@ -346,6 +396,35 @@ propertySchema.virtual('email').get(function () {
 });
 propertySchema.virtual('location').get(function () {
   return this.address || '';
+});
+propertySchema.pre('save', function (next) {
+  const url = (
+    this.locationUrl ||
+    this.googleMapsUrl ||
+    this.googleMapUrl ||
+    this.mapUrl ||
+    this.mapsUrl ||
+    this.details?.locationUrl ||
+    this.details?.googleMapsUrl ||
+    this.details?.googleMapUrl ||
+    this.details?.mapUrl ||
+    this.details?.mapsUrl ||
+    ''
+  ).trim();
+
+  if (url) {
+    this.locationUrl = url;
+    this.googleMapsUrl = url;
+    this.googleMapUrl = url;
+    this.mapUrl = url;
+  }
+  if (this.details && url) {
+    this.details.locationUrl = url;
+    this.details.googleMapsUrl = url;
+    this.details.googleMapUrl = url;
+    this.details.mapUrl = url;
+  }
+  next();
 });
 propertySchema.virtual('rawPrice').get(function () {
   return this.numericPrice || 0;

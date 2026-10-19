@@ -2,6 +2,7 @@ const Property = require('../models/Property');
 const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
+const { resolveGoogleMapsUrl } = require('../utils/googleMapsResolver');
 
 /**
  * Property Intake Controller
@@ -78,6 +79,35 @@ const createProperty = asyncHandler(async (req, res) => {
   if (!data.price) {
     data.price = d.expectedPrice || d.expectedPricePerAcre || '';
   }
+  const incomingMapUrl = (
+    data.locationUrl ||
+    data.googleMapsUrl ||
+    data.googleMapUrl ||
+    data.mapUrl ||
+    data['Google Map URL'] ||
+    data['Location URL'] ||
+    d.locationUrl ||
+    d.googleMapsUrl ||
+    d.googleMapUrl ||
+    d.mapUrl ||
+    d['Google Map URL'] ||
+    d['Location URL'] ||
+    ''
+  ).trim();
+
+  if (incomingMapUrl) {
+    data.locationUrl = incomingMapUrl;
+    data.mapUrl = incomingMapUrl;
+    data.googleMapsUrl = incomingMapUrl;
+    data.googleMapUrl = incomingMapUrl;
+    try {
+      const resolved = await resolveGoogleMapsUrl(incomingMapUrl);
+      if (resolved && resolved.embedUrl) {
+        data.mapEmbedUrl = resolved.embedUrl;
+        data.resolvedLocationUrl = resolved.resolvedUrl;
+      }
+    } catch {}
+  }
 
   const property = await Property.create(data);
   const populated = await Property.findById(property._id).populate(
@@ -107,7 +137,7 @@ const getProperties = asyncHandler(async (req, res) => {
   if (status) {
     filter.status = status;
   } else if (!req.auth || (req.auth.role !== 'admin' && req.auth.role !== 'super-admin')) {
-    filter.status = { $in: ['approved', 'active'] };
+    filter.status = { $in: ['approved', 'active', 'available'] };
   } else {
     filter.status = { $ne: 'deleted' };
   }
@@ -158,27 +188,82 @@ const getProperties = asyncHandler(async (req, res) => {
     Property.countDocuments(filter),
   ]);
 
+  const resolvePropertyLocality = (p) => {
+    if (!p) return '';
+    let locality = (p.locality || p.details?.locality || '').trim();
+    if (locality && !/^bangalore$/i.test(locality) && !/^bengaluru$/i.test(locality)) {
+      return locality;
+    }
+    const combined = `${p.title || ''} ${p.subtitle || ''} ${p.vendorName || ''} ${p.address || ''}`.toLowerCase();
+    if (combined.includes('nelamangala') || combined.includes('bmrda')) return 'Nelamangala';
+    if (combined.includes('kempegowda layout') || combined.includes('nada prabhu') || combined.includes('bda')) return 'Nada Prabhu Kempegowda Layout';
+    if (combined.includes('kanakapura') || combined.includes('annanta') || combined.includes('avaana') || combined.includes('oraiyan')) return 'Kanakapura Road';
+    if (combined.includes('begur') || combined.includes('bbmp enclave') || combined.includes('sp prime')) return 'Begur';
+    if (combined.includes('electronic city') || combined.includes('e-city') || combined.includes('showroom')) return 'Electronic City';
+    if (combined.includes('sarjapur')) return 'Sarjapur Road';
+    if (combined.includes('whitefield') || combined.includes('fortuna')) return 'Whitefield';
+    if (combined.includes('devanahalli') || combined.includes('artemis')) return 'Devanahalli';
+    if (combined.includes('yelahanka')) return 'Yelahanka';
+    if (combined.includes('thanisandra')) return 'Thanisandra';
+    if (combined.includes('kengeri') || combined.includes('sampada')) return 'Kengeri';
+    if (combined.includes('bidadi') || combined.includes('bhoo vaibhav')) return 'Bidadi';
+    if (combined.includes('dobbaspet') || combined.includes('dhabaspet')) return 'Dobbaspet';
+    if (combined.includes('gottigere') || combined.includes('vedanth')) return 'Gottigere';
+    if (combined.includes('jigani')) return 'Jigani';
+    return locality;
+  };
+
   const formatResolvedLocation = (p) => {
     const address = (p.address || '').trim();
-    const locality = (p.locality || p.details?.locality || '').trim();
-    const city = (p.city || p.details?.city || '').trim();
-    const isAddressJustCity = address && city && address.toLowerCase() === city.toLowerCase();
+    const locality = resolvePropertyLocality(p);
+    const rawCity = (p.city || p.details?.city || 'Bangalore').trim();
+    const city = /^\d+$/.test(rawCity) ? 'Bangalore' : (/^bengaluru$/i.test(rawCity) ? 'Bangalore' : rawCity);
+    const cleanAddr = address.toLowerCase();
+    const isAddressJustCity = !address || cleanAddr === 'bangalore' || cleanAddr === 'bengaluru' || cleanAddr === city.toLowerCase();
 
     let resolvedLocation = address;
     if (!resolvedLocation || isAddressJustCity) {
-      resolvedLocation = [locality, address || city].filter(Boolean).join(', ');
+      resolvedLocation = [locality, city].filter(Boolean).join(', ');
     } else if (locality && !resolvedLocation.toLowerCase().includes(locality.toLowerCase())) {
       resolvedLocation = `${locality}, ${resolvedLocation}`;
     }
-    return resolvedLocation || address || city || '';
+    return resolvedLocation || locality || city || 'Bangalore';
   };
 
   const formattedProperties = properties.map((p) => {
     const loc = formatResolvedLocation(p);
+    const resolvedLocality = resolvePropertyLocality(p);
+    const locUrl = (
+      p.locationUrl ||
+      p.googleMapsUrl ||
+      p.googleMapUrl ||
+      p.mapUrl ||
+      p.mapsUrl ||
+      p['Google Map URL'] ||
+      p['Location URL'] ||
+      p['Map URL'] ||
+      p.details?.locationUrl ||
+      p.details?.googleMapsUrl ||
+      p.details?.googleMapUrl ||
+      p.details?.mapUrl ||
+      p.details?.mapsUrl ||
+      p.details?.['Google Map URL'] ||
+      p.details?.['Location URL'] ||
+      p.details?.['Map URL'] ||
+      ''
+    ).trim();
+
     return {
       ...p,
       location: loc,
+      locality: resolvedLocality || p.locality,
       address: p.address || loc,
+      locationUrl: locUrl,
+      mapUrl: locUrl,
+      googleMapsUrl: locUrl,
+      googleMapUrl: locUrl,
+      mapEmbedUrl: p.mapEmbedUrl || p.details?.mapEmbedUrl || '',
+      resolvedLocationUrl: p.resolvedLocationUrl || p.details?.resolvedLocationUrl || '',
     };
   });
 
@@ -205,28 +290,62 @@ const getProperties = asyncHandler(async (req, res) => {
 // @access  Public
 const getPropertyById = asyncHandler(async (req, res) => {
   const property = await Property.findById(req.params.id)
-    .populate('createdBy', 'name fullName email phoneNumber profileImage avatar')
-    .populate('user', 'name fullName email phoneNumber profileImage avatar');
+    .populate('createdBy', 'name fullName email phoneNumber profileImage avatar');
 
   if (!property || property.status === 'deleted') {
     throw new ApiError(404, 'Property listing not found');
   }
 
   const pObj = property.toObject ? property.toObject({ virtuals: true }) : property;
-  const address = (pObj.address || '').trim();
-  const locality = (pObj.locality || pObj.details?.locality || '').trim();
-  const city = (pObj.city || pObj.details?.city || '').trim();
-  const isAddressJustCity = address && city && address.toLowerCase() === city.toLowerCase();
+  const loc = formatResolvedLocation(pObj);
+  const resolvedLocality = resolvePropertyLocality(pObj);
 
-  let resolvedLocation = address;
-  if (!resolvedLocation || isAddressJustCity) {
-    resolvedLocation = [locality, address || city].filter(Boolean).join(', ');
-  } else if (locality && !resolvedLocation.toLowerCase().includes(locality.toLowerCase())) {
-    resolvedLocation = `${locality}, ${resolvedLocation}`;
+  pObj.location = loc;
+  pObj.locality = resolvedLocality || pObj.locality;
+  if (!pObj.address || pObj.address.toLowerCase() === 'bangalore' || pObj.address.toLowerCase() === 'bengaluru') {
+    pObj.address = loc;
+  }
+  const locUrl = (
+    pObj.locationUrl ||
+    pObj.googleMapsUrl ||
+    pObj.googleMapUrl ||
+    pObj.mapUrl ||
+    pObj.mapsUrl ||
+    pObj['Google Map URL'] ||
+    pObj['Location URL'] ||
+    pObj['Map URL'] ||
+    pObj.details?.locationUrl ||
+    pObj.details?.googleMapsUrl ||
+    pObj.details?.googleMapUrl ||
+    pObj.details?.mapUrl ||
+    pObj.details?.mapsUrl ||
+    pObj.details?.['Google Map URL'] ||
+    pObj.details?.['Location URL'] ||
+    pObj.details?.['Map URL'] ||
+    ''
+  ).trim();
+
+  let mapEmbedUrl = pObj.mapEmbedUrl || pObj.details?.mapEmbedUrl || '';
+  let resolvedLocationUrl = pObj.resolvedLocationUrl || pObj.details?.resolvedLocationUrl || '';
+
+  if (locUrl && !mapEmbedUrl) {
+    try {
+      const resolved = await resolveGoogleMapsUrl(locUrl);
+      if (resolved) {
+        mapEmbedUrl = resolved.embedUrl || '';
+        resolvedLocationUrl = resolved.resolvedUrl || '';
+      }
+    } catch (err) {
+      console.warn('[MAP_RESOLVER] Non-fatal resolution warning in getPropertyById:', err.message);
+    }
   }
 
-  pObj.location = resolvedLocation || pObj.address || pObj.city || '';
-  if (!pObj.address) pObj.address = pObj.location;
+  pObj.locationUrl = locUrl;
+  pObj.mapUrl = locUrl;
+  pObj.googleMapsUrl = locUrl;
+  pObj.googleMapUrl = locUrl;
+  pObj.mapEmbedUrl = mapEmbedUrl;
+  pObj.resolvedLocationUrl = resolvedLocationUrl;
 
   new ApiResponse(200, { property: pObj, item: pObj }, 'Property fetched successfully').send(res);
 });
@@ -260,10 +379,24 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
   ).send(res);
 });
 
+// @desc    Resolve Google Maps URL to direct embed URL
+// @route   GET /api/properties/resolve-map-url
+// @access  Public
+const resolveMapUrlController = asyncHandler(async (req, res) => {
+  const targetUrl = req.query.url;
+  if (!targetUrl || typeof targetUrl !== 'string') {
+    throw new ApiError(400, 'url query parameter is required');
+  }
+
+  const result = await resolveGoogleMapsUrl(targetUrl);
+  new ApiResponse(200, result, 'Google Maps URL resolved successfully').send(res);
+});
+
 module.exports = {
   createProperty,
   getProperties,
   getPropertyById,
   updatePropertyStatus,
+  resolveMapUrlController,
 };
 

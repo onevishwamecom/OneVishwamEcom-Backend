@@ -7,6 +7,7 @@ const {
   getProperties,
   getPropertyById,
   updatePropertyStatus,
+  resolveMapUrlController,
 } = require('../controllers/propertyController');
 
 const mongoose = require("mongoose");
@@ -37,6 +38,9 @@ router.post('/', protect, optionalUpload, validatePropertyListing, createPropert
 
 // GET /api/properties — Paginated list with filtering support
 router.get('/', optionalAuth, getProperties);
+
+// GET /api/properties/resolve-map-url — Resolve Google Maps URL (short links, @coords, etc.) to embed URL
+router.get('/resolve-map-url', resolveMapUrlController);
 
 // GET /api/properties/:id — Complete property details by ID (falls through to sub-routes if not a MongoDB ObjectId)
 router.get('/:id', (req, res, next) => {
