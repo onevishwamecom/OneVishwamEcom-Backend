@@ -8,50 +8,7 @@ const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
 
 const router = express.Router();
 
-const CATEGORY_TO_MODULE = {
-  properties: 'properties',
-  property: 'properties',
-  'real-estate': 'properties',
-  vehicle: 'vehicles',
-  vehicles: 'vehicles',
-  automobile: 'vehicles',
-  automobiles: 'vehicles',
-  car: 'vehicles',
-  cars: 'vehicles',
-  bike: 'vehicles',
-  bikes: 'vehicles',
-  '4-wheeler': 'vehicles',
-  '2-wheeler': 'vehicles',
-  '3-wheeler': 'vehicles',
-  commercial: 'vehicles',
-  'commercial vehicle': 'vehicles',
-  'electric vehicle': 'vehicles',
-  'auto rickshaw': 'vehicles',
-  grocery: 'groceries',
-  groceries: 'groceries',
-  garment: 'garments',
-  garments: 'garments',
-  jewellery: 'jewellery',
-  finance: 'finance',
-  service: 'properties',
-  bedding: 'garments',
-  electronics: 'garments',
-};
-
-function findModule(type) {
-  const normalized = CATEGORY_TO_MODULE[type?.toLowerCase?.()] || type;
-  let mod = modules.find((m) => m.id === normalized);
-  if (!mod && normalized?.endsWith('s')) {
-    mod = modules.find((m) => m.id === normalized.slice(0, -1));
-  }
-  if (!mod && normalized && !normalized.endsWith('s')) {
-    mod = modules.find((m) => m.id === `${normalized}s`);
-  }
-  if (!mod) {
-    mod = modules.find((m) => m.id === 'properties') || modules[0];
-  }
-  return mod;
-}
+const { CATEGORY_TO_MODULE, findModule, normalizeCategory } = require('../config/constants');
 
 // Status constants
 const LISTER_ALLOWED_STATUSES = ['pending', 'changes-required'];
@@ -138,8 +95,7 @@ router.delete('/bulk/batches/:batchId', protect, bulkListingController.deleteBat
 // POST /api/listings  — create a listing owned by the authenticated account.
 router.post('/', protect, asyncHandler(async (req, res) => {
   const typeHint = req.body._type || req.body.categoryType || req.body.serviceType;
-  const rawCat = (req.body.category || '').toLowerCase();
-  const type = typeHint || CATEGORY_TO_MODULE[rawCat] || req.body.category || 'properties';
+  const type = normalizeCategory(typeHint || req.body.category) || 'properties';
   const mod = findModule(type);
 
   const body = { ...req.body };
@@ -151,6 +107,11 @@ router.post('/', protect, asyncHandler(async (req, res) => {
   delete body.status; // Backend controls status - always PENDING on creation
 
   const data = { ...body, status: 'pending' };
+
+  // Enforce maximum 5 images across all categories; direct web links bypass Firebase Storage
+  if (Array.isArray(data.images)) {
+    data.images = data.images.map((img) => (typeof img === 'string' ? img.trim() : '')).filter(Boolean).slice(0, 5);
+  }
 
   if (mod.id === 'vehicles') {
     if (!data.category || data.category === 'vehicle' || data.category === 'vehicles' || data.category === 'car') {
@@ -273,6 +234,11 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
     delete body.status;
   }
 
+  // Enforce maximum 5 images across all categories; direct web links bypass Firebase Storage
+  if (Array.isArray(body.images)) {
+    body.images = body.images.map((img) => (typeof img === 'string' ? img.trim() : '')).filter(Boolean).slice(0, 5);
+  }
+
   const wasApproved = item.status === 'approved';
   const wasCancelled = item.status === 'cancelled' || item.status === 'rejected';
   Object.assign(item, body);
@@ -333,9 +299,8 @@ router.get('/admin/all', protect, adminOnly, asyncHandler(async (req, res) => {
     const filter = {};
     if (status) filter.status = status;
     if (category && category !== 'all') {
-      // Check if category matches this module
-      const catToMod = Object.entries(CATEGORY_TO_MODULE).find(([, v]) => v === mod.id);
-      if (catToMod && catToMod[0] !== category) return;
+      const targetMod = normalizeCategory(category);
+      if (targetMod !== mod.id) return;
     }
     if (listerId) filter.lister = listerId;
     if (search) {

@@ -111,23 +111,11 @@ const refresh = asyncHandler(async (req, res) => {
 
 // ─── Listing Management ─────────────────────────────────────────────────────
 
-const CATEGORY_TO_MODULE = {
-  properties: 'properties',
-  'real-estate': 'properties',
-  vehicle: 'vehicles',
-  vehicles: 'vehicles',
-  automobile: 'vehicles',
-  automobiles: 'vehicles',
-  grocery: 'groceries',
-  garment: 'garments',
-  jewellery: 'jewellery',
-  finance: 'finance',
-  service: 'properties',
-};
+const { CATEGORY_TO_MODULE, findModule: lookupModule, normalizeCategory } = require('../config/constants');
 
 function findModule(type) {
-  const normalized = CATEGORY_TO_MODULE[type] || type;
-  const mod = modules.find((m) => m.id === normalized);
+  if (!type) throw new ApiError(400, 'Listing type is required');
+  const mod = lookupModule(type, false);
   if (!mod) throw new ApiError(400, `Unknown listing type "${type}"`);
   return mod;
 }
@@ -141,7 +129,10 @@ const getPendingListings = asyncHandler(async (req, res) => {
   let total = 0;
 
   await Promise.all(modules.map(async (mod) => {
-    if (category && CATEGORY_TO_MODULE[category] && CATEGORY_TO_MODULE[category] !== mod.id) return;
+    if (category && category !== 'all') {
+      const targetMod = normalizeCategory(category);
+      if (targetMod !== mod.id) return;
+    }
     try {
       const items = await mod.model
         .find({ status: 'pending' })
@@ -170,7 +161,10 @@ const getAllListings = asyncHandler(async (req, res) => {
   let total = 0;
 
   await Promise.all(modules.map(async (mod) => {
-    if (category && CATEGORY_TO_MODULE[category] && CATEGORY_TO_MODULE[category] !== mod.id) return;
+    if (category && category !== 'all') {
+      const targetMod = normalizeCategory(category);
+      if (targetMod !== mod.id) return;
+    }
     const filter = {};
     if (status) filter.status = status;
     if (listerId) {

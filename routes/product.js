@@ -9,5 +9,7 @@ modules.forEach(mod => {
 
 router.use('/automobile', require('../modules/vehicles/routes'));
 router.use('/automobiles', require('../modules/vehicles/routes'));
+router.use('/consumer-electronics', require('../modules/electronics/routes'));
+router.use('/consumer_electronics', require('../modules/electronics/routes'));
 
 module.exports = router;

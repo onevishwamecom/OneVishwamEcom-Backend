@@ -47,9 +47,7 @@ const vehicleSchema = new mongoose.Schema({
   keyAttributes: { type: [mongoose.Schema.Types.Mixed], default: [] },
   overviewHighlights: { type: [mongoose.Schema.Types.Mixed], default: [] },
   images: { type: [String], default: [] },
-  video: { type: String, default: '', trim: true },
   videoUrl: { type: String, default: '', trim: true },
-  videos: { type: [String], default: [] },
   documents: { type: [String], default: [] },
   pdfUrl: { type: String, default: '' },
   brochure: { type: String, default: '' },
@@ -126,6 +124,11 @@ vehicleSchema.pre('save', function (next) {
   if (!this.title) {
     this.title = `${this.brand} ${this.model} ${this.year || ''}`.trim();
   }
+  if (!this.videoUrl && this.video) this.videoUrl = this.video;
+  if (!this.videoUrl && Array.isArray(this.videos) && this.videos[0]) this.videoUrl = this.videos[0];
+  this.video = undefined;
+  this.videos = undefined;
+
   if (this.isModified('price') || this.isNew) {
     const parsed = parsePrice(this.price);
     if (parsed > 0) {

@@ -29,9 +29,7 @@ const jewellerySchema = new mongoose.Schema({
   tryAtHome: { type: Boolean, default: false, index: true },
   aiRecommended: { type: Boolean, default: false, index: true },
   images: { type: [String], default: [] },
-  video: { type: String, default: '', trim: true },
   videoUrl: { type: String, default: '', trim: true },
-  videos: { type: [String], default: [] },
   documents: { type: [String], default: [] },
   pdfUrl: { type: String, default: '' },
   brochure: { type: String, default: '' },
@@ -82,6 +80,11 @@ jewellerySchema.index({
 }, { weights: { name: 10, title: 10, category: 5, metalType: 5, description: 1, 'store.city': 3 }, name: 'jewellery_search' });
 
 jewellerySchema.pre('save', function (next) {
+  if (!this.videoUrl && this.video) this.videoUrl = this.video;
+  if (!this.videoUrl && Array.isArray(this.videos) && this.videos[0]) this.videoUrl = this.videos[0];
+  this.video = undefined;
+  this.videos = undefined;
+
   if (this.isNew && !this.name && this.title) this.name = this.title;
   if (this.isNew && !this.title && this.name) this.title = this.name;
   if (this.isModified('price') || this.isNew) {

@@ -9,47 +9,12 @@ const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { parsePrice } = require('../utils/priceUtils');
 
-// Mapping frontend categories to backend module ids
-const CATEGORY_TO_MODULE = {
-  properties: 'properties',
-  'real-estate': 'properties',
-  realestate: 'properties',
-  vehicle: 'vehicles',
-  vehicles: 'vehicles',
-  grocery: 'groceries',
-  groceries: 'groceries',
-  garment: 'garments',
-  garments: 'garments',
-  jewellery: 'jewellery',
-  jewelry: 'jewellery',
-  bedding: 'garments',
-  service: 'properties',
-};
-
-// Normalized category slug lookup
-const CATEGORY_CANONICAL_SLUG = {
-  properties: 'properties',
-  'real-estate': 'properties',
-  realestate: 'properties',
-  vehicle: 'vehicle',
-  vehicles: 'vehicle',
-  grocery: 'grocery',
-  groceries: 'grocery',
-  garment: 'garment',
-  garments: 'garment',
-  jewellery: 'jewellery',
-  jewelry: 'jewellery',
-  bedding: 'bedding',
-  service: 'service',
-};
-
-function findModule(type) {
-  let mod = modules.find((m) => m.id === type);
-  if (!mod) {
-    mod = modules.find((m) => m.id === 'properties') || modules[0];
-  }
-  return mod;
-}
+const {
+  CATEGORY_TO_MODULE,
+  CATEGORY_CANONICAL_SLUG,
+  normalizeCategory,
+  findModule,
+} = require('../config/constants');
 
 /**
  * Validate that uploaded filename matches the expected pattern:
@@ -67,18 +32,19 @@ function validateFilenamePattern(filename, selectedCategory) {
   const match = cleanName.match(regex);
 
   if (!match) {
-    const canonical = CATEGORY_CANONICAL_SLUG[selectedCategory?.toLowerCase()] || selectedCategory || 'category';
+    const canonical =
+      CATEGORY_CANONICAL_SLUG[selectedCategory?.toLowerCase()] ||
+      CATEGORY_CANONICAL_SLUG[normalizeCategory(selectedCategory)] ||
+      selectedCategory ||
+      'category';
     throw new ApiError(
       400,
       `Invalid file name: "${cleanName}". The file name must match the downloaded template pattern: ${canonical}_bulklisting_YYYYMMDD_HHmmss.xlsx (e.g. ${canonical}_bulklisting_20261016_133000.xlsx).`
     );
   }
 
-  const fileCategory = match[1].toLowerCase().replace(/[-_]/g, '');
-  const normSelected = (selectedCategory || '').toLowerCase().replace(/[-_]/g, '');
-
-  const normFileModule = CATEGORY_TO_MODULE[fileCategory] || fileCategory;
-  const normSelectedModule = CATEGORY_TO_MODULE[normSelected] || normSelected;
+  const normFileModule = normalizeCategory(match[1]);
+  const normSelectedModule = normalizeCategory(selectedCategory);
 
   if (normFileModule !== normSelectedModule) {
     throw new ApiError(
@@ -508,13 +474,12 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
     createdAt: new Date(),
   };
 
-  const moduleId = CATEGORY_TO_MODULE[selectedCategory] || 'properties';
-  const mod = findModule(moduleId);
+  const mod = findModule(selectedCategory, false);
   if (!mod || !mod.model) {
     throw new ApiError(400, `Unsupported module for category: ${selectedCategory}`);
   }
-
-  const canonicalSlug = CATEGORY_CANONICAL_SLUG[selectedCategory] || selectedCategory;
+  const moduleId = mod.id;
+  const canonicalSlug = CATEGORY_CANONICAL_SLUG[moduleId] || moduleId;
   const batchTimestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
   const randomPart = Math.random().toString(36).substring(2, 7).toUpperCase();
   const batchId = `BATCH_${canonicalSlug.toUpperCase()}_${batchTimestamp}_${randomPart}`;
@@ -614,7 +579,6 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
           bankLoanDetails: r.bankLoanDetails || 'Available on request',
           loanApproved: Boolean(r.bankLoanDetails && !String(r.bankLoanDetails).toLowerCase().includes('no')),
           images: imagesList,
-          video: videoUrl,
           videoUrl: videoUrl,
           pdfUrl: pdfUrl,
           brochure: pdfUrl,
@@ -696,7 +660,6 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
             amenities: amenitiesList,
             negotiable: r.negotiable || r.priceSuffix || '',
             images: imagesList,
-            video: videoUrl,
             videoUrl: videoUrl,
             pdfUrl: pdfUrl,
             brochure: pdfUrl,
@@ -778,9 +741,7 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
           pincode: r.pincode && /^\d{6}$/.test(String(r.pincode).trim()) ? String(r.pincode).trim() : '560001',
           description: r.description || `${brand} ${model} in good condition`,
           images: imagesList,
-          video: videoUrl,
           videoUrl: videoUrl,
-          videos: videoUrl ? [videoUrl] : [],
           pdfUrl: pdfUrl,
           brochure: pdfUrl,
           status: 'pending', // ALWAYS PENDING
@@ -937,6 +898,70 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
           bulkFilename: file.originalname,
           bulkUploadedAt: new Date(),
           createdBy: ownerId,
+        };
+        documentsToInsert.push(doc);
+      } else if (moduleId === 'electronics') {
+        const title = r.title || r.name || '';
+        const brand = r.brand || '';
+        const model = r.model || '';
+        const price = r.price ? String(r.price).trim() : '';
+
+        if (!title && (!brand || !model)) {
+          errors.push(`${rowNum}: Title or Brand & Model is required`);
+          continue;
+        }
+        if (!price) {
+          errors.push(`${rowNum}: Price is required`);
+          continue;
+        }
+
+        const discreteImages = [r.image1, r.image2, r.image3, r.image4, r.image5].filter(Boolean);
+        let imagesList = [];
+        if (clientMedia.images && Array.isArray(clientMedia.images) && clientMedia.images.filter(Boolean).length > 0) {
+          imagesList = clientMedia.images.filter(Boolean);
+        } else if (discreteImages.length > 0) {
+          imagesList = discreteImages;
+        } else if (r.images) {
+          imagesList = String(r.images).split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
+        }
+        imagesList = imagesList.slice(0, 5);
+
+        const videoUrl = clientMedia.video || clientMedia.videoUrl || r.video || r.videoUrl || '';
+        const pdfUrl = clientMedia.pdfUrl || clientMedia.brochure || r.pdfUrl || r.brochure || '';
+        const finalTitle = title || `${brand} ${model}`.trim();
+        const numPrice = parsePrice(price);
+
+        const doc = {
+          title: finalTitle,
+          name: finalTitle,
+          brand: brand || 'Generic',
+          model: model || finalTitle,
+          category: r.category || 'Consumer Electronics',
+          subcategory: r.subcategory || sheetName || 'Electronics',
+          condition: r.condition || 'Brand New Sealed',
+          warranty: r.warranty || '1 Year Brand Warranty',
+          price: price.startsWith('₹') ? price : `₹ ${price}`,
+          numericPrice: numPrice,
+          priceValue: numPrice,
+          priceSuffix: r.priceSuffix || '',
+          city: r.city ? String(r.city).trim().toLowerCase() : 'bengaluru',
+          location: r.location || r.area || 'Bengaluru',
+          description: r.description || `${finalTitle} with official warranty`,
+          images: imagesList,
+          videoUrl: videoUrl,
+          pdfUrl: pdfUrl,
+          brochure: pdfUrl,
+          status: 'pending',
+          approvalStatus: 'pending',
+          isBulkListing: true,
+          bulkBatchId: batchId,
+          bulkFilename: file.originalname,
+          bulkUploadedAt: new Date(),
+          createdBy: ownerId,
+          lister: ownerId,
+          user: ownerId,
+          contributor: contributorObj,
+          origin: isOneVishwamUser ? 'in_house_project' : 'channel_partner_project',
         };
         documentsToInsert.push(doc);
       }
@@ -1118,8 +1143,7 @@ exports.getBulkBatches = asyncHandler(async (req, res) => {
   // Populate live items from module collections so updates/deletions are immediately reflected
   const enrichedBatches = await Promise.all(
     batches.map(async (b) => {
-      const moduleId = CATEGORY_TO_MODULE[b.category] || b.category;
-      const mod = findModule(moduleId);
+      const mod = findModule(b.category, false);
       if (mod && mod.model) {
         const liveItems = await mod.model
           .find({ bulkBatchId: b.batchId })
@@ -1182,8 +1206,7 @@ exports.getBulkBatchById = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Bulk upload batch not found');
   }
 
-  const moduleId = CATEGORY_TO_MODULE[batch.category] || batch.category;
-  const mod = findModule(moduleId);
+  const mod = findModule(batch.category, false);
   if (mod && mod.model) {
     const liveItems = await mod.model
       .find({ bulkBatchId: batch.batchId })
@@ -1226,8 +1249,7 @@ exports.addItemToBatch = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Bulk upload batch not found');
   }
 
-  const moduleId = CATEGORY_TO_MODULE[batch.category] || batch.category;
-  const mod = findModule(moduleId);
+  const mod = findModule(batch.category, false);
   if (!mod || !mod.model) {
     throw new ApiError(400, 'Invalid category for this batch');
   }
@@ -1303,6 +1325,11 @@ exports.addItemToBatch = asyncHandler(async (req, res) => {
     newDocData.metalType = req.body.metalType || 'Gold';
     newDocData.purity = req.body.purity || '22K';
     newDocData.weightGrams = parseFloat(req.body.weightGrams) || 1;
+  } else if (moduleId === 'electronics') {
+    newDocData.brand = brand || itemTitle.split(' ')[0] || 'Brand';
+    newDocData.model = model || itemTitle.split(' ').slice(1).join(' ') || 'Model';
+    newDocData.condition = req.body.condition || 'Brand New Sealed';
+    newDocData.warranty = req.body.warranty || '1 Year Brand Warranty';
   }
 
   const createdDoc = await mod.model.create(newDocData);
@@ -1345,8 +1372,7 @@ exports.updateBatchItem = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Bulk upload batch not found');
   }
 
-  const moduleId = CATEGORY_TO_MODULE[batch.category] || batch.category;
-  const mod = findModule(moduleId);
+  const mod = findModule(batch.category, false);
   if (!mod || !mod.model) {
     throw new ApiError(400, 'Invalid category for this batch');
   }
@@ -1455,8 +1481,7 @@ exports.deleteBatchItem = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Bulk upload batch not found');
   }
 
-  const moduleId = CATEGORY_TO_MODULE[batch.category] || batch.category;
-  const mod = findModule(moduleId);
+  const mod = findModule(batch.category, false);
   if (mod && mod.model) {
     await mod.model.findByIdAndDelete(itemId);
   }
@@ -1485,8 +1510,7 @@ exports.deleteBatch = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Bulk upload batch not found');
   }
 
-  const moduleId = CATEGORY_TO_MODULE[batch.category] || batch.category;
-  const mod = findModule(moduleId);
+  const mod = findModule(batch.category, false);
   if (mod && mod.model) {
     await mod.model.deleteMany({ bulkBatchId: batchId });
   }

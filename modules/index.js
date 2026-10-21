@@ -6,6 +6,7 @@ const modules = [
   { id: 'jewellery', model: require('./jewellery/model'), routes: require('./jewellery/routes') },
   { id: 'finance', model: require('./finance/model'), routes: require('./finance/routes') },
   { id: 'finance-offerings', model: require('./financeOfferings/model'), routes: require('./financeOfferings/routes') },
+  { id: 'electronics', model: require('./electronics/model'), routes: require('./electronics/routes') },
 ];
 
 module.exports = modules;
