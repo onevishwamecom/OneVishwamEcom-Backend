@@ -10,6 +10,7 @@ const CATEGORIES = [
   'finance',
   'finance-offerings',
   'electronics',
+  'bedding',
 ];
 
 // Single consistent category-to-module mapping across the entire backend
@@ -28,6 +29,9 @@ const CATEGORY_TO_MODULE = {
   'finance-offerings': 'finance-offerings',
   electronics: 'electronics',
   'consumer-electronics': 'electronics',
+  bedding: 'bedding',
+  'bedding-comfort': 'bedding',
+  'bedding_comfort': 'bedding',
 };
 
 // Normalized category slug lookup for filenames and templates
@@ -46,6 +50,8 @@ const CATEGORY_CANONICAL_SLUG = {
   'finance-offerings': 'finance-offerings',
   electronics: 'electronics',
   'consumer-electronics': 'electronics',
+  bedding: 'bedding',
+  'bedding-comfort': 'bedding',
 };
 
 function normalizeCategory(category) {
