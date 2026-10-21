@@ -486,21 +486,14 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
 
   const defaultChannelPartner = isOneVishwamUser
     ? 'One Vishwam'
-    : (req.user?.partnerName || req.auth?.partnerName || req.user?.name || req.auth?.name || 'Channel Partner');
+    : (req.user?.name || 'Channel Partner');
 
   const defaultVendor = isOneVishwamUser
     ? 'One Vishwam'
-    : (req.user?.name || req.auth?.name || req.user?.partnerName || 'Owner');
+    : (req.user?.name || 'Owner');
 
-  const contributorName =
-    req.user?.name ||
-    req.user?.fullName ||
-    req.auth?.name ||
-    defaultVendor ||
-    (userEmail ? userEmail.split('@')[0] : '') ||
-    'Contributor';
-
-  const contributorPhone = req.user?.phone || req.user?.phoneNumber || req.user?.mobile || '';
+  const contributorName = req.user?.name || defaultVendor || 'Contributor';
+  const contributorPhone = req.user?.phone || '';
   const contributorCity = req.user?.city || '';
 
   const contributorObj = {
@@ -761,6 +754,9 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
           (f) => f.toLowerCase() === fuelVal.toLowerCase()
         ) || 'Petrol';
 
+        const videoUrl = clientMedia.video || clientMedia.videoUrl || r.video || r.videoUrl || '';
+        const pdfUrl = clientMedia.pdfUrl || clientMedia.brochure || r.pdfUrl || r.brochure || '';
+
         const doc = {
           title: r.title || `${brand} ${model} ${year}`,
           brand,
@@ -776,17 +772,28 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
           kmDriven: parseInt(r.kmDriven, 10) || 0,
           price: price.startsWith('₹') ? price : `₹ ${price}`,
           priceValue: numPrice,
+          numericPrice: numPrice,
           location: r.location || r.area || city,
           city,
           pincode: r.pincode && /^\d{6}$/.test(String(r.pincode).trim()) ? String(r.pincode).trim() : '560001',
           description: r.description || `${brand} ${model} in good condition`,
           images: imagesList,
+          video: videoUrl,
+          videoUrl: videoUrl,
+          videos: videoUrl ? [videoUrl] : [],
+          pdfUrl: pdfUrl,
+          brochure: pdfUrl,
           status: 'pending', // ALWAYS PENDING
+          approvalStatus: 'pending',
           isBulkListing: true,
           bulkBatchId: batchId,
           bulkFilename: file.originalname,
           bulkUploadedAt: new Date(),
           createdBy: ownerId,
+          lister: ownerId,
+          user: ownerId,
+          contributor: contributorObj,
+          origin: isOneVishwamUser ? 'in_house_project' : 'channel_partner_project',
         };
         documentsToInsert.push(doc);
       } else if (moduleId === 'groceries') {

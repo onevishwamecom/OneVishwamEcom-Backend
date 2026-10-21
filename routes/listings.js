@@ -8,13 +8,29 @@ const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
 
 const router = express.Router();
 
-// Maps the listing-admin "category" field to a backend module id.
 const CATEGORY_TO_MODULE = {
   properties: 'properties',
+  property: 'properties',
   'real-estate': 'properties',
   vehicle: 'vehicles',
+  vehicles: 'vehicles',
+  automobile: 'vehicles',
+  automobiles: 'vehicles',
+  car: 'vehicles',
+  cars: 'vehicles',
+  bike: 'vehicles',
+  bikes: 'vehicles',
+  '4-wheeler': 'vehicles',
+  '2-wheeler': 'vehicles',
+  '3-wheeler': 'vehicles',
+  commercial: 'vehicles',
+  'commercial vehicle': 'vehicles',
+  'electric vehicle': 'vehicles',
+  'auto rickshaw': 'vehicles',
   grocery: 'groceries',
+  groceries: 'groceries',
   garment: 'garments',
+  garments: 'garments',
   jewellery: 'jewellery',
   finance: 'finance',
   service: 'properties',
@@ -23,7 +39,14 @@ const CATEGORY_TO_MODULE = {
 };
 
 function findModule(type) {
-  let mod = modules.find((m) => m.id === type);
+  const normalized = CATEGORY_TO_MODULE[type?.toLowerCase?.()] || type;
+  let mod = modules.find((m) => m.id === normalized);
+  if (!mod && normalized?.endsWith('s')) {
+    mod = modules.find((m) => m.id === normalized.slice(0, -1));
+  }
+  if (!mod && normalized && !normalized.endsWith('s')) {
+    mod = modules.find((m) => m.id === `${normalized}s`);
+  }
   if (!mod) {
     mod = modules.find((m) => m.id === 'properties') || modules[0];
   }
@@ -114,7 +137,9 @@ router.delete('/bulk/batches/:batchId', protect, bulkListingController.deleteBat
 
 // POST /api/listings  — create a listing owned by the authenticated account.
 router.post('/', protect, asyncHandler(async (req, res) => {
-  const type = req.body._type || CATEGORY_TO_MODULE[req.body.category] || req.body.category || 'properties';
+  const typeHint = req.body._type || req.body.categoryType || req.body.serviceType;
+  const rawCat = (req.body.category || '').toLowerCase();
+  const type = typeHint || CATEGORY_TO_MODULE[rawCat] || req.body.category || 'properties';
   const mod = findModule(type);
 
   const body = { ...req.body };
@@ -126,6 +151,15 @@ router.post('/', protect, asyncHandler(async (req, res) => {
   delete body.status; // Backend controls status - always PENDING on creation
 
   const data = { ...body, status: 'pending' };
+
+  if (mod.id === 'vehicles') {
+    if (!data.category || data.category === 'vehicle' || data.category === 'vehicles' || data.category === 'car') {
+      data.category = data.wheelerType || (data.subcategory === 'Bike' ? '2-wheeler' : data.subcategory === 'Auto Rickshaw' ? '3-wheeler' : data.subcategory === 'Commercial Vehicle' ? 'commercial' : '4-wheeler');
+    }
+    if (!data.wheelerType) {
+      data.wheelerType = data.category || '4-wheeler';
+    }
+  }
 
   const mongoose = require('mongoose');
   const isValidObjectId = (val) => val && mongoose.Types.ObjectId.isValid(String(val));
@@ -147,24 +181,15 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     data.isPriority = true;
     data.featured = true;
   } else {
-    data.channelPartnerName = data.channelPartnerName || req.user?.partnerName || req.auth?.partnerName || req.user?.name || req.user?.fullName || req.auth?.name || 'External Partner';
-    data.vendorName = data.vendorName || req.user?.name || req.user?.fullName || req.auth?.name || req.user?.partnerName || req.auth?.partnerName || 'Independent Owner';
-    data.origin = req.user?.origin || req.auth?.origin || 'channel_partner_project';
+    data.channelPartnerName = data.channelPartnerName || req.user?.name || 'External Partner';
+    data.vendorName = data.vendorName || req.user?.name || 'Independent Owner';
+    data.origin = req.user?.origin || 'channel_partner_project';
   }
 
   data.bankLoanDetails = data.bankLoanDetails || 'Available on request';
 
-  const contributorName =
-    req.user?.name ||
-    req.user?.fullName ||
-    req.auth?.name ||
-    body.contributor?.name ||
-    data.vendorName ||
-    data.channelPartnerName ||
-    (userEmail ? userEmail.split('@')[0] : '') ||
-    'Contributor';
-
-  const contributorPhone = req.user?.phone || req.user?.phoneNumber || req.user?.mobile || body.contributor?.contact || body.contact || '';
+  const contributorName = req.user?.name || body.contributor?.name || data.vendorName || 'Contributor';
+  const contributorPhone = req.user?.phone || body.contributor?.contact || body.contact || '';
   const contributorCity = req.user?.city || body.contributor?.city || body.city || '';
 
   data.contributor = {

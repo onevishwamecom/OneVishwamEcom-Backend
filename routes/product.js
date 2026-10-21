@@ -7,4 +7,7 @@ modules.forEach(mod => {
   router.use(`/${mod.id}`, mod.routes);
 });
 
+router.use('/automobile', require('../modules/vehicles/routes'));
+router.use('/automobiles', require('../modules/vehicles/routes'));
+
 module.exports = router;

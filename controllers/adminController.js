@@ -115,6 +115,9 @@ const CATEGORY_TO_MODULE = {
   properties: 'properties',
   'real-estate': 'properties',
   vehicle: 'vehicles',
+  vehicles: 'vehicles',
+  automobile: 'vehicles',
+  automobiles: 'vehicles',
   grocery: 'groceries',
   garment: 'garments',
   jewellery: 'jewellery',
@@ -123,7 +126,8 @@ const CATEGORY_TO_MODULE = {
 };
 
 function findModule(type) {
-  const mod = modules.find((m) => m.id === type);
+  const normalized = CATEGORY_TO_MODULE[type] || type;
+  const mod = modules.find((m) => m.id === normalized);
   if (!mod) throw new ApiError(400, `Unknown listing type "${type}"`);
   return mod;
 }

@@ -45,6 +45,12 @@ const CARD_PROJECTION = {
   model: 1,
   year: 1,
   fuelType: 1,
+  transmission: 1,
+  kmDriven: 1,
+  condition: 1,
+  statusBadges: 1,
+  cardPills: 1,
+  showroom: 1,
   // Grocery-specific
   unit: 1,
   stock: 1,
