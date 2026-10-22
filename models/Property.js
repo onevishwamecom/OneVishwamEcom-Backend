@@ -437,6 +437,9 @@ propertySchema.virtual('user').get(function () {
 });
 
 // Compound Indexes for fast dashboard & filter queries
+propertySchema.index({ status: 1, availabilityStatus: 1, priority: -1, createdAt: -1 });
+propertySchema.index({ status: 1, availabilityStatus: 1, numericPrice: 1 });
+propertySchema.index({ status: 1, city: 1, propertyType: 1, createdAt: -1 });
 propertySchema.index({ propertyType: 1, status: 1 });
 propertySchema.index({ createdBy: 1, createdAt: -1 });
 propertySchema.index({ city: 1, area: 1 });

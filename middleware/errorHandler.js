@@ -1,12 +1,19 @@
 const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Internal Server Error';
+  let errors = Array.isArray(err.errors) ? err.errors : [];
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
     statusCode = 400;
     const messages = Object.values(err.errors).map((e) => e.message);
     message = messages.join(', ');
+    if (errors.length === 0) {
+      errors = Object.entries(err.errors).map(([field, errObj]) => ({
+        field,
+        message: errObj.message,
+      }));
+    }
   }
 
   // Mongoose bad ObjectId
@@ -49,17 +56,22 @@ const errorHandler = (err, req, res, next) => {
   }
 
   if (statusCode >= 500) {
-    // Log full error server-side for debugging
     console.error(`[ERROR] ${req.method} ${req.originalUrl}`, err);
     if (process.env.NODE_ENV === 'production') {
       message = 'An unexpected internal error occurred. Please try again later.';
     }
   }
 
-  res.status(statusCode).json({
+  const payload = {
     success: false,
     message,
-  });
+  };
+
+  if (errors.length > 0) {
+    payload.errors = errors;
+  }
+
+  res.status(statusCode).json(payload);
 };
 
 module.exports = errorHandler;

@@ -100,6 +100,11 @@ beddingSchema.pre('save', function (next) {
   next();
 });
 
+beddingSchema.index({ status: 1, availabilityStatus: 1, createdAt: -1 });
+beddingSchema.index({ status: 1, availabilityStatus: 1, subcategory: 1, createdAt: -1 });
+beddingSchema.index({ status: 1, availabilityStatus: 1, numericPrice: 1 });
+beddingSchema.index({ brand: 1, model: 1 });
+beddingSchema.index({ createdAt: -1 });
 beddingSchema.index({ title: 'text', brand: 'text', model: 'text', description: 'text', category: 'text' });
 
 const Bedding = mongoose.models.Bedding || mongoose.model('Bedding', beddingSchema);

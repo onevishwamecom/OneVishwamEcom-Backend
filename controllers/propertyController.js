@@ -269,7 +269,7 @@ const getProperties = asyncHandler(async (req, res) => {
 
   const totalPages = Math.ceil(total / limit) || 1;
 
-  new ApiResponse(
+  const response = new ApiResponse(
     200,
     {
       properties: formattedProperties,
@@ -282,7 +282,13 @@ const getProperties = asyncHandler(async (req, res) => {
       hasPrevPage: page > 1,
     },
     'Properties fetched successfully'
-  ).send(res);
+  );
+
+  if (!req.headers.authorization) {
+    response.setCache(60, 120, 300);
+  }
+
+  response.send(res);
 });
 
 // @desc    Get single property by ID
@@ -347,7 +353,11 @@ const getPropertyById = asyncHandler(async (req, res) => {
   pObj.mapEmbedUrl = mapEmbedUrl;
   pObj.resolvedLocationUrl = resolvedLocationUrl;
 
-  new ApiResponse(200, { property: pObj, item: pObj }, 'Property fetched successfully').send(res);
+  const response = new ApiResponse(200, { property: pObj, item: pObj }, 'Property fetched successfully');
+  if (!req.headers.authorization) {
+    response.setCache(60, 120, 300);
+  }
+  response.send(res);
 });
 
 // @desc    Update property listing status (Admin only)

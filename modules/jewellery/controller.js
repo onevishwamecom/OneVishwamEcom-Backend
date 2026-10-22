@@ -2,11 +2,13 @@ const createCRUDController = require('../baseController');
 const Jewellery = require('./model');
 const ApiResponse = require('../../utils/ApiResponse');
 const ApiError = require('../../utils/ApiError');
+const asyncHandler = require('../../utils/asyncHandler');
+const jewelleryService = require('./jewelleryService');
 
 function parseOccasion(occasion) {
   if (!occasion) return [];
   if (Array.isArray(occasion)) return occasion;
-  return occasion.split(/[,/]/).map(s => s.trim()).filter(Boolean);
+  return occasion.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
 }
 
 function parsePrice(priceStr) {
@@ -19,7 +21,7 @@ function parsePrice(priceStr) {
 function transformCreateData(req, data) {
   const material = data.material || data.metalType || 'Gold';
   const city = data.city || 'Bangalore';
-  
+
   return {
     ...data,
     name: data.name || data.title,
@@ -50,7 +52,7 @@ function transformCreateData(req, data) {
 
 function transformUpdateData(req, item) {
   const data = { ...req.body };
-  
+
   if (data.metalType) item.metalType = data.metalType;
   if (data.purity !== undefined) item.purity = data.purity;
   if (data.weight !== undefined) {
@@ -67,106 +69,12 @@ function transformUpdateData(req, item) {
   if (data.store) item.store = data.store;
   if (data.price !== undefined) item.numericPrice = parsePrice(data.price);
   if (data.images) item.images = data.images;
-  if (data.name) { item.name = data.name; item.title = data.name; }
-  
+  if (data.name) {
+    item.name = data.name;
+    item.title = data.name;
+  }
+
   return item;
-}
-
-function buildJewelleryFilter(query) {
-  const filter = { status: { $in: ['approved', 'active'] } };
-  
-  // Category exact match
-  if (query.category) {
-    filter.category = query.category;
-  }
-  
-  // Search across multiple fields
-  if (query.search || query.q) {
-    const searchTerm = query.search || query.q;
-    filter.$or = [
-      { name: { $regex: searchTerm, $options: 'i' } },
-      { title: { $regex: searchTerm, $options: 'i' } },
-      { description: { $regex: searchTerm, $options: 'i' } },
-      { category: { $regex: searchTerm, $options: 'i' } },
-      { metalType: { $regex: searchTerm, $options: 'i' } },
-      { 'store.city': { $regex: searchTerm, $options: 'i' } },
-    ];
-  }
-  
-  // Occasions - match if any selected occasion is in the product's occasion array
-  if (query.occasions) {
-    const occasions = Array.isArray(query.occasions) ? query.occasions : query.occasions.split(',');
-    if (occasions.length > 0) {
-      filter.occasion = { $in: occasions };
-    }
-  }
-  
-  // Budget range
-  if (query.budgetMin || query.budgetMax) {
-    filter.numericPrice = {};
-    if (query.budgetMin) filter.numericPrice.$gte = Number(query.budgetMin);
-    if (query.budgetMax) filter.numericPrice.$lte = Number(query.budgetMax);
-  }
-  
-  // Metals - match if metalType + " " + purity contains the option OR metalType contains it
-  if (query.metals) {
-    const metals = Array.isArray(query.metals) ? query.metals : query.metals.split(',');
-    if (metals.length > 0) {
-      filter.$or = filter.$or || [];
-      metals.forEach(metal => {
-        filter.$or.push(
-          { $expr: { $regexMatch: { input: { $concat: ['$metalType', ' ', '$purity'] }, regex: metal, options: 'i' } } },
-          { metalType: { $regex: metal, $options: 'i' } }
-        );
-      });
-    }
-  }
-  
-  // Weight range
-  if (query.weightMin || query.weightMax) {
-    filter.weightGrams = {};
-    if (query.weightMin) filter.weightGrams.$gte = Number(query.weightMin);
-    if (query.weightMax) filter.weightGrams.$lte = Number(query.weightMax);
-  }
-  
-  // Genders - exact match
-  if (query.genders) {
-    const genders = Array.isArray(query.genders) ? query.genders : query.genders.split(',');
-    if (genders.length > 0) {
-      filter.gender = { $in: genders };
-    }
-  }
-  
-  // Availability - only Try At Home actually filters
-  if (query.availability) {
-    const availability = Array.isArray(query.availability) ? query.availability : query.availability.split(',');
-    if (availability.includes('Try At Home')) {
-      filter.tryAtHome = true;
-    }
-  }
-  
-  return filter;
-}
-
-function getSort(sortBy) {
-  const sorts = {
-    latest: { createdAt: -1 },
-    oldest: { createdAt: 1 },
-    'price-low': { numericPrice: 1 },
-    'price-high': { numericPrice: -1 },
-  };
-  return sorts[sortBy] || sorts.latest;
-}
-
-function paginate(page = 1, limit = 20) {
-  const p = Math.max(1, Number(page));
-  const l = Math.min(100, Math.max(1, Number(limit)));
-  return { skip: (p - 1) * l, page: p, limit: l };
-}
-
-function buildPagination(page, limit, total) {
-  const totalPages = Math.ceil(total / limit);
-  return { page, limit, totalItems: total, totalPages, hasNextPage: page < totalPages, hasPreviousPage: page > 1 };
 }
 
 const base = createCRUDController({
@@ -182,71 +90,30 @@ const base = createCRUDController({
   transformUpdateData,
 });
 
-// Override getAll with custom filter logic
-const getAll = async (req, res) => {
-  const filter = buildJewelleryFilter(req.query);
-  const sort = getSort(req.query.sortBy || req.query.sort);
-  const { skip, page, limit } = paginate(req.query.page, req.query.limit);
-  
-  const [items, total] = await Promise.all([
-    Jewellery.find(filter).sort(sort).skip(skip).limit(limit),
-    Jewellery.countDocuments(filter),
-  ]);
-  
-  new ApiResponse(200, { items, pagination: buildPagination(page, limit, total) }, 'Fetched successfully').send(res);
-};
+const getAll = asyncHandler(async (req, res) => {
+  const result = await jewelleryService.getAll(req.query);
+  new ApiResponse(200, result, 'Fetched successfully').send(res);
+});
 
-const getById = async (req, res) => {
-  const item = await Jewellery.findOne({ _id: req.params.id, status: { $in: ['approved', 'active'] } });
-  if (!item) {
-    throw new ApiError(404, 'Item not found');
-  }
+const getById = asyncHandler(async (req, res) => {
+  const item = await jewelleryService.getById(req.params.id);
   new ApiResponse(200, { item }, 'Fetched successfully').send(res);
-};
+});
 
-const getMy = async (req, res) => {
-  const items = await Jewellery.find({ user: req.user._id }).sort({ createdAt: -1 });
+const getMy = asyncHandler(async (req, res) => {
+  const items = await jewelleryService.getMy(req.user._id);
   new ApiResponse(200, { items }, 'Your listings fetched').send(res);
-};
+});
 
-const getSimilar = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const item = await Jewellery.findById(id);
-    if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
-    }
-    
-    const similar = await Jewellery.find({
-      _id: { $ne: id },
-      category: item.category,
-      status: { $in: ['approved', 'active'] },
-    })
-      .limit(4)
-      .sort({ featured: -1, createdAt: -1 });
-    
-    res.json({ data: { items: similar } });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch similar items' });
-  }
-};
+const getSimilar = asyncHandler(async (req, res) => {
+  const items = await jewelleryService.getSimilar(req.params.id);
+  res.json({ data: { items } });
+});
 
-const toggleStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const item = await Jewellery.findById(id);
-    if (!item) {
-      return res.status(404).json({ message: 'Item not found' });
-    }
-    
-    item.status = item.status === 'active' ? 'inactive' : 'active';
-    await item.save();
-    
-    res.json({ data: { item }, message: `Status changed to ${item.status}` });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to toggle status' });
-  }
-};
+const toggleStatus = asyncHandler(async (req, res) => {
+  const item = await jewelleryService.toggleStatus(req.params.id, req.user._id, req.user.role);
+  res.json({ data: { item }, message: `Status changed to ${item.status}` });
+});
 
 module.exports = {
   getAll,

@@ -19,8 +19,12 @@ const isDryRun = process.argv.includes("--dry-run");
 
 const MONGODB_URI =
   process.env.ATLAS_MONGODB_URI ||
-  process.env.MONGODB_URI ||
-  "mongodb+srv://onevishwamecom_db_user:VishwamPass123@onevishwam.372aojy.mongodb.net/onevishwam?retryWrites=true&w=majority";
+  process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error("FATAL: Please set ATLAS_MONGODB_URI or MONGODB_URI in .env");
+  process.exit(1);
+}
 
 function parseNumeric(val, fallback = 0) {
   if (typeof val === "number" && !Number.isNaN(val)) return val;

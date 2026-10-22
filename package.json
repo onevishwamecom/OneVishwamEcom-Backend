@@ -14,7 +14,8 @@
     "test": "bash scripts/test-api.sh",
     "seed": "node scripts/seed.js",
     "clear": "node scripts/clearDatabase.js",
-    "cleanup": "node scripts/cleanupDatabase.js"
+    "cleanup": "node scripts/cleanupDatabase.js",
+    "sync:indexes": "node scripts/syncIndexes.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

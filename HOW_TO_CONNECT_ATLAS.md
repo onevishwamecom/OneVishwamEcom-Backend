@@ -15,7 +15,7 @@ The live **`onevishwam`** MongoDB Atlas cluster is fully connected and operation
 
 ## Active Environment Variable (`Vishwam-Backend/.env`)
 ```env
-MONGODB_URI=mongodb+srv://onevishwamecom_db_user:VishwamPass123@onevishwam.372aojy.mongodb.net/onevishwam?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://onevishwamecom_db_user:<password>@onevishwam.372aojy.mongodb.net/onevishwam?retryWrites=true&w=majority
 ```
 
 ---

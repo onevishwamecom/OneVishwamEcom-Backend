@@ -40,11 +40,13 @@ const connectDB = async () => {
     return cachedPromise;
   }
 
-  // Active production cluster fallback (ensures backward compatibility if secrets are omitted)
-  const activeClusterUri =
-    "mongodb+srv://onevishwamecom_db_user:VishwamPass123@onevishwam.372aojy.mongodb.net/onevishwam?retryWrites=true&w=majority";
+  const mongoUri = process.env.ATLAS_MONGODB_URI || process.env.MONGODB_URI;
 
-  const mongoUri = process.env.ATLAS_MONGODB_URI || process.env.MONGODB_URI || activeClusterUri;
+  if (!mongoUri) {
+    const errorMsg = "FATAL: MongoDB connection URI is missing. Please define ATLAS_MONGODB_URI or MONGODB_URI in your environment or secrets.";
+    console.error(`❌ [DATABASE] ${errorMsg}`);
+    throw new Error(errorMsg);
+  }
 
   const opts = {
     serverSelectionTimeoutMS: 8000,

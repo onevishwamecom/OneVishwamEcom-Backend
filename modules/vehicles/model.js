@@ -98,6 +98,9 @@ const vehicleSchema = new mongoose.Schema({
   toObject: { virtuals: true },
 });
 
+vehicleSchema.index({ status: 1, availabilityStatus: 1, createdAt: -1 });
+vehicleSchema.index({ status: 1, availabilityStatus: 1, category: 1, createdAt: -1 });
+vehicleSchema.index({ status: 1, availabilityStatus: 1, priceValue: 1 });
 vehicleSchema.index({ brand: 1, model: 1 });
 vehicleSchema.index({ city: 1, status: 1 });
 vehicleSchema.index({ category: 1, status: 1 });

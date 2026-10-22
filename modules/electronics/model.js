@@ -85,6 +85,9 @@ electronicSchema.virtual('listerRef', {
   justOne: true,
 });
 
+electronicSchema.index({ status: 1, availabilityStatus: 1, createdAt: -1 });
+electronicSchema.index({ status: 1, availabilityStatus: 1, subcategory: 1, createdAt: -1 });
+electronicSchema.index({ status: 1, availabilityStatus: 1, numericPrice: 1 });
 electronicSchema.index({ category: 1, subcategory: 1 });
 electronicSchema.index({ createdAt: -1 });
 electronicSchema.index({ brand: 1, model: 1 });
