@@ -212,6 +212,12 @@ router.get('/:type/:id', protect, asyncHandler(async (req, res) => {
   new ApiResponse(200, { item: normalizeListingItem(item) }, 'Listing fetched').send(res);
 }));
 
+const adminController = require('../controllers/adminController');
+
+// PATCH /api/listings/:type/:id/images/reorder — reorder images in batch
+router.patch('/:type/:id/images/reorder', protect, adminController.reorderListingImages);
+router.patch('/:id/images/reorder', protect, adminController.reorderListingImages);
+
 // PATCH /api/listings/:type/:id — update owned listing.
 router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   const mod = findModule(req.params.type);
@@ -229,19 +235,32 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   delete body.user;
   delete body.lister;
   delete body._type;
-  // Non-admins cannot change status directly
+  // When a lister edits any product/listing, revert status to 'pending' so admin can review and approve it
   if (req.auth.role !== 'admin') {
+    item.status = 'pending';
+    item.adminComment = null;
+    item.markModified('status');
     delete body.status;
   }
 
   // Enforce maximum 5 images across all categories; direct web links bypass Firebase Storage
   if (Array.isArray(body.images)) {
-    body.images = body.images.map((img) => (typeof img === 'string' ? img.trim() : '')).filter(Boolean).slice(0, 5);
+    const cleanImgs = body.images.map((img) => (typeof img === 'string' ? img.trim() : '')).filter(Boolean).slice(0, 5);
+    body.images = cleanImgs;
+    item.images = cleanImgs;
+    item.markModified('images');
+    if (item.details && typeof item.details === 'object') {
+      item.details.images = cleanImgs;
+      item.markModified('details');
+    }
   }
 
   const wasApproved = item.status === 'approved';
   const wasCancelled = item.status === 'cancelled' || item.status === 'rejected';
   Object.assign(item, body);
+  if (Array.isArray(body.images)) {
+    item.markModified('images');
+  }
 
   // Enforce priority for in-house / ceo@onevishwam.com listings
   const userEmail = (req.user?.email || req.auth?.email || '').toLowerCase();
@@ -256,6 +275,9 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   }
 
   await item.save();
+  if (mod?.service?.cache) {
+    mod.service.cache.delete(String(req.params.id));
+  }
   new ApiResponse(200, { item: normalizeListingItem(item) }, 'Listing updated successfully').send(res);
 }));
 

@@ -471,11 +471,104 @@ const overrideListing = asyncHandler(async (req, res) => {
     }
   }
 
+  if (Array.isArray(updates.images)) {
+    const cleanImages = updates.images
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : (entry?.url || entry?.src || '')))
+      .filter(Boolean)
+      .slice(0, 5);
+    item.images = cleanImages;
+    item.markModified('images');
+    if (item.details && typeof item.details === 'object') {
+      item.details.images = cleanImages;
+      item.markModified('details');
+    }
+  }
+
   Object.assign(item, updates);
+  if (Array.isArray(updates.images)) {
+    item.markModified('images');
+  }
   item.updatedAt = new Date();
   await item.save();
 
+  if (mod?.service?.cache) {
+    mod.service.cache.delete(String(id));
+  }
+
   new ApiResponse(200, { item }, 'Listing overridden successfully').send(res);
+});
+
+const reorderListingImages = asyncHandler(async (req, res) => {
+  const { type, id } = req.params;
+  const rawList = Array.isArray(req.body)
+    ? req.body
+    : Array.isArray(req.body.images)
+    ? req.body.images
+    : Array.isArray(req.body.reorderedImages)
+    ? req.body.reorderedImages
+    : null;
+
+  if (!rawList) {
+    throw new ApiError(400, 'Payload must be an array of images or an object containing an "images" array');
+  }
+
+  // Find target model
+  let targetMod = null;
+  let item = null;
+  if (type) {
+    targetMod = findModule(type);
+    item = await targetMod.model.findById(id);
+  } else {
+    for (const m of modules) {
+      if (!m?.model) continue;
+      const found = await m.model.findById(id);
+      if (found) {
+        targetMod = m;
+        item = found;
+        break;
+      }
+    }
+  }
+
+  if (!item) throw new ApiError(404, 'Listing not found');
+
+  // Parse and sort images based on position / index
+  let orderedUrls = [];
+  if (rawList.length > 0 && typeof rawList[0] === 'object' && rawList[0] !== null) {
+    // If elements have position or sort_order or order
+    const sorted = [...rawList].sort((a, b) => {
+      const posA = Number(a.position ?? a.order ?? a.sort_order ?? 0);
+      const posB = Number(b.position ?? b.order ?? b.sort_order ?? 0);
+      return posA - posB;
+    });
+    orderedUrls = sorted
+      .map((entry) => entry.url || entry.imageUrl || entry.image || entry.src || entry.imageId)
+      .filter((url) => typeof url === 'string' && url.trim().length > 0);
+  } else {
+    // Array of string URLs
+    orderedUrls = rawList
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean);
+  }
+
+  // Enforce maximum 5 images
+  orderedUrls = orderedUrls.slice(0, 5);
+
+  item.images = orderedUrls;
+  if (item.details && typeof item.details === 'object' && Array.isArray(item.details.images)) {
+    item.details.images = orderedUrls;
+    item.markModified('details');
+  }
+  item.markModified('images');
+  item.updatedAt = new Date();
+  await item.save();
+
+  // Clear LRU cache if service exists
+  if (targetMod?.service?.cache) {
+    targetMod.service.cache.delete(String(id));
+  }
+
+  new ApiResponse(200, { item, images: item.images }, 'Images reordered successfully').send(res);
 });
 
 const updateListingStatus = asyncHandler(async (req, res) => {
@@ -842,6 +935,7 @@ module.exports = {
   getListingDetail,
   updateListingStatus,
   overrideListing,
+  reorderListingImages,
   approveListing,
   requestChanges,
   cancelListing,
