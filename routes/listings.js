@@ -381,6 +381,12 @@ router.get('/admin/stats', protect, adminOnly, asyncHandler(async (req, res) => 
     } catch { }
   }));
 
+  stats.totalListings = stats.total;
+  stats.pendingListings = stats.pending;
+  stats.approvedListings = stats.approved;
+  stats.cancelledListings = stats.cancelled;
+  stats.changesRequiredListings = stats['changes-required'];
+
   new ApiResponse(200, stats, 'Admin listing stats fetched').send(res);
 }));
 

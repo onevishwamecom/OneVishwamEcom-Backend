@@ -284,6 +284,38 @@ const getListingStats = asyncHandler(async (req, res) => {
     console.warn('⚠️ [ADMIN STATS]: User collection count failed:', err.message);
   }
 
+  // Exact aliases expected by Admin frontend
+  stats.totalListings = stats.total;
+  stats.pendingListings = stats.pending;
+  stats.approvedListings = stats.approved;
+  stats.cancelledListings = stats.cancelled;
+  stats.changesRequiredListings = stats['changes-required'];
+
+  try {
+    const VisitorCounter = require('../models/VisitorCounter');
+    const VisitorSession = require('../models/VisitorSession');
+    const d = new Date();
+    const today = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    const counter = await VisitorCounter.findOne({ key: 'global' }).lean();
+    const activeThreshold = new Date(Date.now() - 45 * 1000);
+    const realActive = await VisitorSession.countDocuments({
+      isOnline: true,
+      lastSeenAt: { $gte: activeThreshold },
+    }).catch(() => 0);
+
+    const visitsToday = counter?.todayDate === today ? (counter?.todayHits || counter?.todayVisitors || 0) : 0;
+
+    stats.visitorStats = {
+      totalVisitors: counter?.totalVisitors || counter?.totalHits || 0,
+      totalHits: counter?.totalHits || counter?.totalVisitors || 0,
+      visitsToday: visitsToday || 0,
+      uniqueToday: counter?.todayVisitors || 0,
+      activeVisitors: Math.max(realActive, 1),
+    };
+  } catch (err) {
+    console.warn('⚠️ [ADMIN STATS]: Visitor counter fetch failed:', err.message);
+  }
+
   new ApiResponse(200, stats, 'Admin listing stats fetched').send(res);
 });
 
@@ -380,11 +412,54 @@ const getWebsiteUsers = asyncHandler(async (req, res) => {
       totalTimeSpent: u.totalTimeSpent || 0,
       sessionDuration: u.sessionDuration || 0,
       loginCount: u.loginCount || (u.lastLogin ? 1 : 0),
+      interests: u.interests || [],
+      primaryInterest: u.primaryInterest || '',
+      browsingHistory: (u.browsingHistory || []).slice(0, 10),
       createdAt: u.createdAt,
     };
   });
 
   new ApiResponse(200, { users: formattedUsers, total, page: p, limit: l }, 'Website users fetched').send(res);
+});
+
+const getUserActivity = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  let user = null;
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    user = await User.findById(id).select('-password -refreshToken').lean();
+  }
+  if (!user) {
+    user = await User.findOne({ $or: [{ email: id }, { firebaseUid: id }] }).select('-password -refreshToken').lean();
+  }
+  if (!user) throw new ApiError(404, 'User not found');
+
+  new ApiResponse(
+    200,
+    {
+      user: {
+        _id: user._id,
+        name: user.name || user.fullName || 'User',
+        email: user.email || 'N/A',
+        phone: user.phoneNumber || user.mobile || 'N/A',
+        avatar: user.avatar || user.profileImage || '',
+        city: user.city || '',
+        area: user.area || '',
+        pincode: user.pincode || '',
+        role: user.role || 'user',
+        status: user.status || user.accountStatus || 'active',
+        isEmailVerified: Boolean(user.isEmailVerified),
+        lastLogin: user.lastLogin,
+        lastActiveAt: user.lastActiveAt,
+        totalTimeSpent: user.totalTimeSpent || 0,
+        sessionDuration: user.sessionDuration || 0,
+        createdAt: user.createdAt,
+        primaryInterest: user.primaryInterest || '',
+        interests: user.interests || [],
+        browsingHistory: user.browsingHistory || [],
+      },
+    },
+    'User activity fetched'
+  ).send(res);
 });
 
 const getListingDetail = asyncHandler(async (req, res) => {
@@ -924,6 +999,89 @@ const getContributorById = asyncHandler(async (req, res) => {
   new ApiResponse(200, { contributor: lister, listings, totalListings }, 'Contributor details fetched').send(res);
 });
 
+const getCategoryBreakdown = asyncHandler(async (req, res) => {
+  const { timeframe = 'all' } = req.query;
+  const now = new Date();
+  const lookupTimeframe = {};
+
+  if (timeframe === 'day') {
+    lookupTimeframe.visitedAt = { $gte: new Date(now.setHours(0, 0, 0, 0)) };
+  } else if (timeframe === 'week') {
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    lookupTimeframe.visitedAt = { $gte: weekAgo };
+  } else if (timeframe === 'month') {
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    lookupTimeframe.visitedAt = { $gte: monthAgo };
+  }
+  // 'all' returns no time filter
+
+  const pipeline = [
+    { $match: lookupTimeframe },
+    {
+      $group: {
+        _id: '$category',
+        totalVisits: { $sum: 1 },
+        uniqueVisitors: { $addToSet: '$sessionIdentifier' },
+        firstVisit: { $min: '$visitedAt' },
+        lastVisit: { $max: '$visitedAt' },
+      },
+    },
+    { $sort: { totalVisits: -1 } },
+  ];
+
+  const categoryBreakdown = await Activity.aggregate(pipeline);
+
+  // Format the unique visitor count
+  const formatted = categoryBreakdown.map((item) => ({
+    category: item._id || 'unknown',
+    totalVisits: item.totalVisits || 0,
+    uniqueVisitors: item.uniqueVisitors ? item.uniqueVisitors.length : 0,
+    firstVisit: item.firstVisit || null,
+    lastVisit: item.lastVisit || null,
+  }));
+
+  new ApiResponse(200, { categoryBreakdown: formatted, timeframe }).send(res);
+});
+
+const getActivityStats = asyncHandler(async (req, res) => {
+  const { timeframe = 'all' } = req.query;
+  const now = new Date();
+  const lookup = {};
+
+  if (timeframe === 'day') {
+    lookup.visitedAt = { $gte: new Date(now.setHours(0, 0, 0, 0)) };
+  } else if (timeframe === 'week') {
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    lookup.visitedAt = { $gte: weekAgo };
+  } else if (timeframe === 'month') {
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    lookup.visitedAt = { $gte: monthAgo };
+  }
+
+  const totalActivity = await Activity.countDocuments(lookup);
+
+  const categoryStats = await Activity.aggregate([
+    { $match: lookup },
+    {
+      $group: {
+        _id: '$category',
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { count: -1 } },
+  ]);
+
+  new ApiResponse(
+    200,
+    {
+      totalActivity,
+      categoryStats,
+      timeframe,
+    },
+    'Activity stats fetched'
+  ).send(res);
+});
+
 module.exports = {
   login,
   getMe,
@@ -945,4 +1103,7 @@ module.exports = {
   getContributorById,
   getWebsiteUserStats,
   getWebsiteUsers,
+  getUserActivity,
+  getActivityStats,
+  getCategoryBreakdown,
 };

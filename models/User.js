@@ -87,6 +87,26 @@ const userSchema = new mongoose.Schema(
     resetPasswordToken: String,
     resetPasswordExpire: Date,
     savedListings: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Property' }],
+    interests: [
+      {
+        category: { type: String, required: true },
+        viewCount: { type: Number, default: 1 },
+        lastVisitedAt: { type: Date, default: Date.now },
+      },
+    ],
+    browsingHistory: [
+      {
+        category: { type: String, default: 'general' },
+        listingId: { type: String },
+        title: { type: String, default: '' },
+        price: { type: String, default: '' },
+        location: { type: String, default: '' },
+        image: { type: String, default: '' },
+        path: { type: String, default: '' },
+        visitedAt: { type: Date, default: Date.now },
+      },
+    ],
+    primaryInterest: { type: String, default: '' },
     notifications: {
       email: { type: Boolean, default: false },
       whatsapp: { type: Boolean, default: false },

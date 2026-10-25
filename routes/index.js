@@ -17,8 +17,12 @@ const propertyRoutes = require('./propertyRoutes');
 const propertyRequirementRoutes = require('./propertyRequirements');
 const financeOfferingsRoutes = require('../modules/financeOfferings/routes');
 const bulkListingRoutes = require('./bulkListing');
+const visitorRoutes = require('./visitors');
 
 const router = express.Router();
+
+// Visitor Counter / Analytics
+router.use('/visitors', visitorRoutes);
 
 // Bulk intake
 router.use('/bulk-listing', bulkListingRoutes);
@@ -39,6 +43,7 @@ modules
 
 router.use('/auth', authRoutes);
 router.use('/auth/lister', listerRoutes);
+router.use('/users', userRoutes);
 router.use('/admin', adminRoutes);
 router.use('/homepage', homepageRoutes);
 router.use('/product', productRoutes);

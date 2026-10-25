@@ -65,5 +65,10 @@ router.get('/contributors/:id', adminController.getContributorById);
 // Website Users
 router.get('/users/stats', adminController.getWebsiteUserStats);
 router.get('/users', adminController.getWebsiteUsers);
+router.get('/users/:id/activity', adminController.getUserActivity);
+
+// Activity & Interest Tracking
+router.get('/activity/stats', adminController.getActivityStats);
+router.get('/activity/category-breakdown', adminController.getCategoryBreakdown);
 
 module.exports = router;
