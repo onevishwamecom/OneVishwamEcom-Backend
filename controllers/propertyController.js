@@ -80,33 +80,25 @@ const createProperty = asyncHandler(async (req, res) => {
     data.price = d.expectedPrice || d.expectedPricePerAcre || '';
   }
   const incomingMapUrl = (
-    data.locationUrl ||
-    data.googleMapsUrl ||
-    data.googleMapUrl ||
     data.mapUrl ||
-    data['Google Map URL'] ||
-    data['Location URL'] ||
-    d.locationUrl ||
-    d.googleMapsUrl ||
-    d.googleMapUrl ||
     d.mapUrl ||
-    d['Google Map URL'] ||
-    d['Location URL'] ||
     ''
   ).trim();
 
-  if (incomingMapUrl) {
-    data.locationUrl = incomingMapUrl;
-    data.mapUrl = incomingMapUrl;
-    data.googleMapsUrl = incomingMapUrl;
-    data.googleMapUrl = incomingMapUrl;
-    try {
-      const resolved = await resolveGoogleMapsUrl(incomingMapUrl);
-      if (resolved && resolved.embedUrl) {
-        data.mapEmbedUrl = resolved.embedUrl;
-        data.resolvedLocationUrl = resolved.resolvedUrl;
-      }
-    } catch {}
+  data.mapUrl = incomingMapUrl;
+  if (d) d.mapUrl = incomingMapUrl;
+
+  delete data.locationUrl;
+  delete data.googleMapsUrl;
+  delete data.googleMapUrl;
+  delete data.mapEmbedUrl;
+  delete data.resolvedLocationUrl;
+  if (d) {
+    delete d.locationUrl;
+    delete d.googleMapsUrl;
+    delete d.googleMapUrl;
+    delete d.mapEmbedUrl;
+    delete d.resolvedLocationUrl;
   }
 
   const property = await Property.create(data);
@@ -230,40 +222,75 @@ const getProperties = asyncHandler(async (req, res) => {
     return resolvedLocation || locality || city || 'Bangalore';
   };
 
+  const cleanPropertyOutput = (p) => {
+    if (!p || typeof p !== 'object') return p;
+    const cleanP = { ...p };
+
+    // Remove legacy map duplicate keys
+    delete cleanP.locationUrl;
+    delete cleanP.googleMapsUrl;
+    delete cleanP.googleMapUrl;
+    delete cleanP.mapEmbedUrl;
+    delete cleanP.resolvedLocationUrl;
+
+    // Remove redundant user/lister aliases
+    delete cleanP.user;
+    delete cleanP.lister;
+    if (cleanP.contributor?.listerId && cleanP.listerId === cleanP.contributor.listerId) {
+      delete cleanP.listerId;
+    }
+
+    // Remove redundant media/virtual aliases
+    delete cleanP.video;
+    delete cleanP.videos;
+    delete cleanP.brochure;
+    delete cleanP.email;
+    delete cleanP.rawPrice;
+    delete cleanP.isPriority;
+
+    // Clean details subdocument duplicates
+    if (cleanP.details && typeof cleanP.details === 'object') {
+      cleanP.details = { ...cleanP.details };
+      delete cleanP.details.mapUrl;
+      delete cleanP.details.locationUrl;
+      delete cleanP.details.googleMapsUrl;
+      delete cleanP.details.googleMapUrl;
+      delete cleanP.details.mapEmbedUrl;
+      delete cleanP.details.resolvedLocationUrl;
+
+      if (cleanP.details.propertyName === cleanP.title) delete cleanP.details.propertyName;
+      if (cleanP.details.expectedPrice === cleanP.price) delete cleanP.details.expectedPrice;
+      if (cleanP.details.possessionStatus === cleanP.possessionStatus) delete cleanP.details.possessionStatus;
+      if (cleanP.details.vendorName === cleanP.vendorName) delete cleanP.details.vendorName;
+      if (cleanP.details.channelPartnerName === cleanP.channelPartnerName) delete cleanP.details.channelPartnerName;
+      if (cleanP.details.approvalAuthority === cleanP.approval) delete cleanP.details.approvalAuthority;
+    }
+
+    // Remove subtitle if identical to vendorName or channelPartnerName
+    if (cleanP.subtitle && (cleanP.subtitle === cleanP.vendorName || cleanP.subtitle === cleanP.channelPartnerName)) {
+      delete cleanP.subtitle;
+    }
+
+    return cleanP;
+  };
+
   const formattedProperties = properties.map((p) => {
     const loc = formatResolvedLocation(p);
     const resolvedLocality = resolvePropertyLocality(p);
     const locUrl = (
-      p.locationUrl ||
-      p.googleMapsUrl ||
-      p.googleMapUrl ||
       p.mapUrl ||
-      p.mapsUrl ||
-      p['Google Map URL'] ||
-      p['Location URL'] ||
-      p['Map URL'] ||
-      p.details?.locationUrl ||
-      p.details?.googleMapsUrl ||
-      p.details?.googleMapUrl ||
       p.details?.mapUrl ||
-      p.details?.mapsUrl ||
-      p.details?.['Google Map URL'] ||
-      p.details?.['Location URL'] ||
-      p.details?.['Map URL'] ||
       ''
     ).trim();
 
+    const cleaned = cleanPropertyOutput(p);
+
     return {
-      ...p,
+      ...cleaned,
       location: loc,
       locality: resolvedLocality || p.locality,
       address: p.address || loc,
-      locationUrl: locUrl,
       mapUrl: locUrl,
-      googleMapsUrl: locUrl,
-      googleMapUrl: locUrl,
-      mapEmbedUrl: p.mapEmbedUrl || p.details?.mapEmbedUrl || '',
-      resolvedLocationUrl: p.resolvedLocationUrl || p.details?.resolvedLocationUrl || '',
     };
   });
 
@@ -302,7 +329,7 @@ const getPropertyById = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Property listing not found');
   }
 
-  const pObj = property.toObject ? property.toObject({ virtuals: true }) : property;
+  const pObj = property.toObject ? property.toObject({ virtuals: false }) : property;
   const loc = formatResolvedLocation(pObj);
   const resolvedLocality = resolvePropertyLocality(pObj);
 
@@ -312,48 +339,15 @@ const getPropertyById = asyncHandler(async (req, res) => {
     pObj.address = loc;
   }
   const locUrl = (
-    pObj.locationUrl ||
-    pObj.googleMapsUrl ||
-    pObj.googleMapUrl ||
     pObj.mapUrl ||
-    pObj.mapsUrl ||
-    pObj['Google Map URL'] ||
-    pObj['Location URL'] ||
-    pObj['Map URL'] ||
-    pObj.details?.locationUrl ||
-    pObj.details?.googleMapsUrl ||
-    pObj.details?.googleMapUrl ||
     pObj.details?.mapUrl ||
-    pObj.details?.mapsUrl ||
-    pObj.details?.['Google Map URL'] ||
-    pObj.details?.['Location URL'] ||
-    pObj.details?.['Map URL'] ||
     ''
   ).trim();
 
-  let mapEmbedUrl = pObj.mapEmbedUrl || pObj.details?.mapEmbedUrl || '';
-  let resolvedLocationUrl = pObj.resolvedLocationUrl || pObj.details?.resolvedLocationUrl || '';
-
-  if (locUrl && !mapEmbedUrl) {
-    try {
-      const resolved = await resolveGoogleMapsUrl(locUrl);
-      if (resolved) {
-        mapEmbedUrl = resolved.embedUrl || '';
-        resolvedLocationUrl = resolved.resolvedUrl || '';
-      }
-    } catch (err) {
-      console.warn('[MAP_RESOLVER] Non-fatal resolution warning in getPropertyById:', err.message);
-    }
-  }
-
-  pObj.locationUrl = locUrl;
   pObj.mapUrl = locUrl;
-  pObj.googleMapsUrl = locUrl;
-  pObj.googleMapUrl = locUrl;
-  pObj.mapEmbedUrl = mapEmbedUrl;
-  pObj.resolvedLocationUrl = resolvedLocationUrl;
+  const cleaned = cleanPropertyOutput(pObj);
 
-  const response = new ApiResponse(200, { property: pObj, item: pObj }, 'Property fetched successfully');
+  const response = new ApiResponse(200, { property: cleaned, item: cleaned }, 'Property fetched successfully');
   if (!req.headers.authorization) {
     response.setCache(60, 120, 300);
   }

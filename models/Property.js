@@ -125,14 +125,6 @@ const propertyDetailsSchema = new mongoose.Schema(
     // Common commercial/financial terms across categories
     expectedPrice: { type: String, trim: true },
     negotiable: { type: String, trim: true },
-
-    // Location URL (Google Maps)
-    locationUrl: { type: String, trim: true },
-    googleMapsUrl: { type: String, trim: true },
-    googleMapUrl: { type: String, trim: true },
-    mapUrl: { type: String, trim: true },
-    mapEmbedUrl: { type: String, trim: true },
-    resolvedLocationUrl: { type: String, trim: true },
   },
   { _id: false, strict: false }
 );
@@ -258,12 +250,7 @@ const propertySchema = new mongoose.Schema(
     pincode: { type: String, trim: true, default: '' },
     address: { type: String, trim: true, default: '' },
     landmark: { type: String, trim: true, default: '' },
-    locationUrl: { type: String, trim: true, default: '' },
-    googleMapsUrl: { type: String, trim: true, default: '' },
-    googleMapUrl: { type: String, trim: true, default: '' },
     mapUrl: { type: String, trim: true, default: '' },
-    mapEmbedUrl: { type: String, trim: true, default: '' },
-    resolvedLocationUrl: { type: String, trim: true, default: '' },
     contact: { type: String, trim: true, default: '' },
     contactEmail: { type: String, trim: true, default: '' },
     featured: { type: Boolean, default: false, index: true },
@@ -313,65 +300,57 @@ const propertySchema = new mongoose.Schema(
             .map((d) => d.url);
         }
 
-        // Virtual backwards-compatible aliases (ensures zero breaking changes across all frontends)
-        const v = ret.videoUrl || '';
-        ret.video = v;
-        ret.videos = v ? [v] : [];
-        ret.brochure = ret.pdfUrl || '';
-        ret.email = ret.contactEmail || '';
-        ret.location = ret.address || '';
-        ret.rawPrice = ret.numericPrice || 0;
-        ret.isPriority = Boolean(ret.priority && ret.priority > 0);
-        ret.lister = ret.lister || ret.createdBy;
-        ret.user = ret.createdBy;
-
-        // Virtual details compatibility
-        if (!ret.details.propertyName) ret.details.propertyName = ret.title;
-        if (!ret.details.expectedPrice) ret.details.expectedPrice = ret.price;
-        if (!ret.details.possessionStatus) ret.details.possessionStatus = ret.possessionStatus;
-        if (!ret.details.vendorName) ret.details.vendorName = ret.vendorName;
-        if (!ret.details.channelPartnerName) ret.details.channelPartnerName = ret.channelPartnerName;
-
+        // Ensure single canonical mapUrl at root
         const locUrl = (
-          ret.locationUrl ||
-          ret.googleMapsUrl ||
-          ret.googleMapUrl ||
           ret.mapUrl ||
-          ret.mapsUrl ||
-          ret['Google Map URL'] ||
-          ret['Location URL'] ||
-          ret['Map URL'] ||
-          ret.details?.locationUrl ||
-          ret.details?.googleMapsUrl ||
-          ret.details?.googleMapUrl ||
           ret.details?.mapUrl ||
-          ret.details?.mapsUrl ||
-          ret.details?.['Google Map URL'] ||
-          ret.details?.['Location URL'] ||
-          ret.details?.['Map URL'] ||
           ''
         ).trim();
-
-        ret.locationUrl = locUrl;
-        ret.googleMapsUrl = locUrl;
-        ret.googleMapUrl = locUrl;
         ret.mapUrl = locUrl;
-        ret.mapEmbedUrl = ret.mapEmbedUrl || ret.details?.mapEmbedUrl || '';
-        ret.resolvedLocationUrl = ret.resolvedLocationUrl || ret.details?.resolvedLocationUrl || '';
 
-        if (ret.details) {
-          ret.details.locationUrl = locUrl;
-          ret.details.googleMapsUrl = locUrl;
-          ret.details.googleMapUrl = locUrl;
-          ret.details.mapUrl = locUrl;
-          ret.details.mapEmbedUrl = ret.mapEmbedUrl;
-          ret.details.resolvedLocationUrl = ret.resolvedLocationUrl;
+        // Remove all duplicate map URL keys
+        delete ret.googleMapsUrl;
+        delete ret.googleMapUrl;
+        delete ret.mapEmbedUrl;
+        delete ret.resolvedLocationUrl;
+        delete ret.locationUrl;
+
+        // Remove duplicate user/lister keys
+        delete ret.lister;
+        delete ret.user;
+        if (ret.contributor?.listerId && ret.listerId === ret.contributor.listerId) {
+          delete ret.listerId;
+        }
+
+        // Remove duplicate media aliases
+        delete ret.video;
+        delete ret.videos;
+        delete ret.brochure;
+        delete ret.email;
+        delete ret.rawPrice;
+        delete ret.isPriority;
+
+        // Clean details duplicates
+        if (ret.details && typeof ret.details === 'object') {
+          delete ret.details.mapUrl;
+          delete ret.details.googleMapsUrl;
+          delete ret.details.googleMapUrl;
+          delete ret.details.mapEmbedUrl;
+          delete ret.details.resolvedLocationUrl;
+          delete ret.details.locationUrl;
+
+          if (ret.details.propertyName === ret.title) delete ret.details.propertyName;
+          if (ret.details.expectedPrice === ret.price) delete ret.details.expectedPrice;
+          if (ret.details.possessionStatus === ret.possessionStatus) delete ret.details.possessionStatus;
+          if (ret.details.vendorName === ret.vendorName) delete ret.details.vendorName;
+          if (ret.details.channelPartnerName === ret.channelPartnerName) delete ret.details.channelPartnerName;
+          if (ret.details.approvalAuthority === ret.approval) delete ret.details.approvalAuthority;
         }
 
         return ret;
       },
     },
-    toObject: { virtuals: true },
+    toObject: { virtuals: false },
   }
 );
 
@@ -399,30 +378,25 @@ propertySchema.virtual('location').get(function () {
 });
 propertySchema.pre('save', function (next) {
   const url = (
-    this.locationUrl ||
-    this.googleMapsUrl ||
-    this.googleMapUrl ||
     this.mapUrl ||
-    this.mapsUrl ||
-    this.details?.locationUrl ||
-    this.details?.googleMapsUrl ||
-    this.details?.googleMapUrl ||
     this.details?.mapUrl ||
-    this.details?.mapsUrl ||
     ''
   ).trim();
 
-  if (url) {
-    this.locationUrl = url;
-    this.googleMapsUrl = url;
-    this.googleMapUrl = url;
-    this.mapUrl = url;
-  }
-  if (this.details && url) {
-    this.details.locationUrl = url;
-    this.details.googleMapsUrl = url;
-    this.details.googleMapUrl = url;
+  this.mapUrl = url;
+  this.locationUrl = undefined;
+  this.googleMapsUrl = undefined;
+  this.googleMapUrl = undefined;
+  this.mapEmbedUrl = undefined;
+  this.resolvedLocationUrl = undefined;
+
+  if (this.details) {
     this.details.mapUrl = url;
+    this.details.locationUrl = undefined;
+    this.details.googleMapsUrl = undefined;
+    this.details.googleMapUrl = undefined;
+    this.details.mapEmbedUrl = undefined;
+    this.details.resolvedLocationUrl = undefined;
   }
   next();
 });

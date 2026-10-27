@@ -153,7 +153,7 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       firebaseUid: uid,
       ...(email && { email: email.toLowerCase().trim() }),
       ...(resolvedName && { name: resolvedName, fullName: resolvedName }),
-      ...(phone && { phoneNumber: phone.trim(), mobile: phone.trim() }),
+      ...(phone && { phoneNumber: phone.trim(), phone: phone.trim(), mobile: phone.trim() }),
       ...(role && ['user', 'lister'].includes(role) && { role }),
       ...(resolvedImage && { avatar: resolvedImage, profileImage: resolvedImage }),
       ...(city && { city }),
@@ -164,6 +164,46 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       lastLogin: now,
       lastActiveAt: now,
     };
+
+    // Check if another account with this phone already exists to merge or prevent unhandled E11000 duplicate key error
+    if (cleanPhone) {
+      const userWithPhone = await User.findOne({
+        $or: [{ phoneNumber: cleanPhone }, { phone: cleanPhone }, { mobile: cleanPhone }],
+      });
+
+      if (userWithPhone && userWithPhone.firebaseUid !== uid) {
+        const isSameEmail =
+          cleanEmail &&
+          userWithPhone.email &&
+          userWithPhone.email.toLowerCase() === cleanEmail.toLowerCase();
+        const hasNoEmail = !userWithPhone.email || !cleanEmail;
+
+        if (isSameEmail || hasNoEmail) {
+          // Same user: Merge accounts and attach this Firebase UID
+          await User.deleteMany({ firebaseUid: uid, _id: { $ne: userWithPhone._id } }).catch(() => null);
+
+          Object.assign(userWithPhone, updateFields);
+          userWithPhone.firebaseUid = uid;
+          if (cleanEmail) userWithPhone.email = cleanEmail;
+          userWithPhone.loginCount = (userWithPhone.loginCount || 0) + 1;
+          await userWithPhone.save({ validateBeforeSave: false });
+
+          console.log(`[Auth Sync] Successfully merged user with phone ${cleanPhone} to firebaseUid ${uid}`);
+
+          return res.status(200).json({
+            success: true,
+            message: 'User profile linked and saved successfully',
+            data: userWithPhone.toProfileJSON ? userWithPhone.toProfileJSON() : userWithPhone,
+          });
+        } else {
+          // Phone belongs to another registered account
+          return res.status(409).json({
+            success: false,
+            message: 'This mobile number is already registered with another account. Please use a different mobile number or log in with that account.',
+          });
+        }
+      }
+    }
 
     const user = await User.findOneAndUpdate(
       { firebaseUid: uid },
@@ -183,9 +223,25 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
     });
   } catch (error) {
     console.error('[Auth Sync Error]:', error);
+    if (error.code === 11000 || error.message?.includes('E11000')) {
+      if (error.message?.includes('mobile') || error.message?.includes('phoneNumber')) {
+        return res.status(409).json({
+          success: false,
+          message: 'This mobile number is already registered with another account. Please use a different mobile number.',
+          error: error.message,
+        });
+      }
+      if (error.message?.includes('email')) {
+        return res.status(409).json({
+          success: false,
+          message: 'This email is already registered with another account.',
+          error: error.message,
+        });
+      }
+    }
     return res.status(500).json({
       success: false,
-      message: 'Failed to persist user in database',
+      message: error.message || 'Failed to persist user in database',
       error: error.message,
     });
   }

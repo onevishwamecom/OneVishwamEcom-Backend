@@ -67,6 +67,15 @@ const connectDB = async () => {
         await bootstrapAdmin().catch((err) =>
           console.warn("[ADMIN] Non-fatal bootstrap check error:", err.message)
         );
+        try {
+          const usersCol = conn.connection.collection('users');
+          const indexes = await usersCol.indexes();
+          const badIdx = indexes.find((i) => i.name === 'mobile_1' && !i.sparse);
+          if (badIdx) {
+            await usersCol.dropIndex('mobile_1').catch(() => null);
+            console.log('[DATABASE] Cleaned up legacy non-sparse mobile_1 index.');
+          }
+        } catch {}
         isBootstrapped = true;
       }
       return cachedConnection;
