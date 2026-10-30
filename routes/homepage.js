@@ -128,20 +128,36 @@ function formatPropertyCard(p) {
 
 // GET /api/homepage — single endpoint returning all homepage sections
 router.get('/', optionalAuth, asyncHandler(async (req, res) => {
+  const realPhotoQuery = {
+    $or: [
+      { 'images.0': { $regex: '^https?://', $options: 'i' } },
+      { image: { $regex: '^https?://', $options: 'i' } },
+    ],
+  };
+
   const [
-    featuredProperties,
-    latestProperties,
+    featuredWithPhotos,
+    latestWithPhotos,
     latestVehicles,
   ] = await Promise.all([
-    // Featured properties (top 6)
-    Property.find({ featured: true, status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
+    // Featured properties with real photos (top 8)
+    Property.find({
+      featured: true,
+      status: { $in: ['approved', 'active'] },
+      availabilityStatus: { $ne: 'sold_out' },
+      ...realPhotoQuery,
+    })
       .sort({ createdAt: -1 })
-      .limit(6)
+      .limit(8)
       .select(CARD_PROJECTION)
       .lean(),
 
-    // Latest properties (top 8)
-    Property.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
+    // Latest properties with real photos (top 8)
+    Property.find({
+      status: { $in: ['approved', 'active'] },
+      availabilityStatus: { $ne: 'sold_out' },
+      ...realPhotoQuery,
+    })
       .sort({ createdAt: -1 })
       .limit(8)
       .select(CARD_PROJECTION)
@@ -154,6 +170,39 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
       .select(CARD_PROJECTION)
       .lean().catch(() => []),
   ]);
+
+  // Backfill featured if fewer than 6
+  let featuredProperties = featuredWithPhotos;
+  if (featuredProperties.length < 6) {
+    const existingIds = new Set(featuredProperties.map((p) => String(p._id)));
+    const backfill = await Property.find({
+      featured: true,
+      status: { $in: ['approved', 'active'] },
+      availabilityStatus: { $ne: 'sold_out' },
+      _id: { $nin: Array.from(existingIds) },
+    })
+      .sort({ createdAt: -1 })
+      .limit(6 - featuredProperties.length)
+      .select(CARD_PROJECTION)
+      .lean();
+    featuredProperties = featuredProperties.concat(backfill);
+  }
+
+  // Backfill latest if fewer than 8
+  let latestProperties = latestWithPhotos;
+  if (latestProperties.length < 8) {
+    const existingIds = new Set(latestProperties.map((p) => String(p._id)));
+    const backfill = await Property.find({
+      status: { $in: ['approved', 'active'] },
+      availabilityStatus: { $ne: 'sold_out' },
+      _id: { $nin: Array.from(existingIds) },
+    })
+      .sort({ createdAt: -1 })
+      .limit(8 - latestProperties.length)
+      .select(CARD_PROJECTION)
+      .lean();
+    latestProperties = latestProperties.concat(backfill);
+  }
 
   // Stats — only active categories
   const [totalProperties, totalVehicles] = await Promise.all([

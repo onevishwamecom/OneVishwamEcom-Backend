@@ -9,6 +9,8 @@ const modules = require('../modules');
 const Lister = require('../models/Lister');
 const { parsePrice } = require('../utils/priceUtils');
 const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
+const { normalizeCanonicalPropertyType } = require('../models/Property');
+const { recordProductAddition } = require('../services/announcementService');
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
@@ -546,6 +548,30 @@ const overrideListing = asyncHandler(async (req, res) => {
     }
   }
 
+  if (mod.id === 'properties') {
+    const rawType = updates.propertyType || updates.subcategory || item.propertyType || item.subcategory;
+    if (rawType) {
+      const canonicalType = normalizeCanonicalPropertyType(rawType);
+      updates.propertyType = canonicalType;
+      item.propertyType = canonicalType;
+      if (item.details && typeof item.details === 'object') {
+        item.details.propertyType = canonicalType;
+      }
+      if (updates.details && typeof updates.details === 'object') {
+        updates.details.propertyType = canonicalType;
+      }
+    }
+    delete updates.subcategory;
+    if (item.subcategory !== undefined) {
+      item.set('subcategory', undefined);
+    }
+    if (item._doc && 'subcategory' in item._doc) {
+      delete item._doc.subcategory;
+    }
+    item.markModified('propertyType');
+    item.markModified('details');
+  }
+
   if (Array.isArray(updates.images)) {
     const cleanImages = updates.images
       .map((entry) => (typeof entry === 'string' ? entry.trim() : (entry?.url || entry?.src || '')))
@@ -558,6 +584,20 @@ const overrideListing = asyncHandler(async (req, res) => {
       item.markModified('details');
     }
   }
+
+  // Any edit in admin must NOT become pending status. Keep or set to 'approved'.
+  if (updates.status === 'pending' || !updates.status) {
+    if (item.status === 'pending' || item.status === 'changes-required' || item.status === 'approved' || !item.status) {
+      item.status = 'approved';
+      updates.status = 'approved';
+    } else {
+      updates.status = item.status;
+    }
+  } else {
+    item.status = updates.status;
+  }
+  item.adminComment = null;
+  item.markModified('status');
 
   Object.assign(item, updates);
   if (Array.isArray(updates.images)) {
@@ -698,6 +738,10 @@ const approveListing = asyncHandler(async (req, res) => {
 
   item.updatedAt = new Date();
   await item.save();
+
+  recordProductAddition(type || 'properties', 1).catch((err) =>
+    console.error('Failed to log product announcement in approveListing:', err.message)
+  );
 
   new ApiResponse(200, { item }, 'Listing approved successfully').send(res);
 });

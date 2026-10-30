@@ -18,8 +18,12 @@ const propertyRequirementRoutes = require('./propertyRequirements');
 const financeOfferingsRoutes = require('../modules/financeOfferings/routes');
 const bulkListingRoutes = require('./bulkListing');
 const visitorRoutes = require('./visitors');
+const announcementRoutes = require('./announcementRoutes');
 
 const router = express.Router();
+
+// Top Ribbon Announcements / Notifications
+router.use('/announcements', announcementRoutes);
 
 // Visitor Counter / Analytics
 router.use('/visitors', visitorRoutes);

@@ -35,6 +35,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       unique: true,
       sparse: true,
+      index: true,
     },
     listerId: {
       type: String,

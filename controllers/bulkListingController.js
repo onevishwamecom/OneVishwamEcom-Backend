@@ -22,6 +22,7 @@ const {
   normalizePropertyType,
   extractMultipartFileAndFields,
 } = require('../services/bulkListingParser');
+const { recordProductAddition } = require('../services/announcementService');
 
 
 /**
@@ -243,7 +244,6 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
           channelPartnerName: defaultChannelPartner,
           propertyType,
           category: 'properties',
-          subcategory,
           purpose: r.purpose || 'Sell',
           price: price.startsWith('₹') ? price : `₹ ${price}`,
           numericPrice: numPrice,
@@ -657,6 +657,12 @@ exports.bulkUploadListings = asyncHandler(async (req, res) => {
   // 6. Insert documents into MongoDB
   const inserted = await mod.model.insertMany(documentsToInsert, { ordered: false });
 
+  if (inserted && inserted.length > 0) {
+    recordProductAddition(selectedCategory, inserted.length).catch((err) =>
+      console.error('Failed to log bulk product announcement:', err.message)
+    );
+  }
+
   // 7. Create BulkUploadBatch record
   const batchItems = inserted.map((i) => ({
     itemId: i._id,
@@ -796,7 +802,13 @@ exports.getTemplateDownloadLogs = asyncHandler(async (req, res) => {
  * Fetches bulk upload batches (Lister sees their own; Admin sees all batches)
  */
 exports.getBulkBatches = asyncHandler(async (req, res) => {
-  const isAdmin = req.auth?.role === 'admin' || req.auth?.accountType === 'admin';
+  const isAdmin = Boolean(
+    req.auth?.role === 'admin' ||
+    req.auth?.role === 'super-admin' ||
+    req.auth?.accountType === 'admin' ||
+    req.user?.role === 'admin' ||
+    req.user?.role === 'super-admin'
+  );
   const userEmail = (req.user?.email || req.auth?.email || '').toLowerCase();
   const ownerId = req.auth?.id || req.user?._id;
 
@@ -975,7 +987,8 @@ exports.addItemToBatch = asyncHandler(async (req, res) => {
   };
 
   if (moduleId === 'properties') {
-    newDocData.propertyType = normalizePropertyType(subcategory);
+    newDocData.propertyType = normalizePropertyType(req.body.propertyType || subcategory);
+    delete newDocData.subcategory;
     newDocData.purpose = req.body.purpose || 'Sell';
     newDocData.vendorName = batch.listerName || 'Owner';
     newDocData.details = {
@@ -1059,7 +1072,13 @@ exports.updateBatchItem = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Item not found');
   }
 
-  const isAdmin = req.auth?.role === 'admin' || req.auth?.accountType === 'admin';
+  const isAdmin = Boolean(
+    req.auth?.role === 'admin' ||
+    req.auth?.role === 'super-admin' ||
+    req.auth?.accountType === 'admin' ||
+    req.user?.role === 'admin' ||
+    req.user?.role === 'super-admin'
+  );
   const updates = { ...req.body };
 
   if (updates.title) {
@@ -1082,9 +1101,13 @@ exports.updateBatchItem = asyncHandler(async (req, res) => {
     product.location = updates.location;
     product.area = updates.location;
   }
-  if (updates.subcategory) {
-    product.subcategory = updates.subcategory;
-    if (moduleId === 'properties') product.propertyType = normalizePropertyType(updates.subcategory);
+  if (updates.subcategory || updates.propertyType) {
+    if (moduleId === 'properties') {
+      product.propertyType = normalizePropertyType(updates.propertyType || updates.subcategory);
+      delete product.subcategory;
+    } else {
+      product.subcategory = updates.subcategory;
+    }
   }
   if (updates.description) product.description = updates.description;
   if (Array.isArray(updates.images)) product.images = updates.images;
@@ -1103,10 +1126,16 @@ exports.updateBatchItem = asyncHandler(async (req, res) => {
     product.brochure = updates.brochure;
   }
 
-  // Status updates: Admin can approve/reject; if lister edits, status remains pending
-  if (isAdmin && updates.status) {
-    product.status = updates.status;
-  } else if (!isAdmin) {
+  // Status updates: Admin edits must not become pending (keep or set approved); if lister edits, status remains pending
+  if (isAdmin) {
+    if (updates.status === 'pending' || !updates.status) {
+      if (product.status === 'pending' || product.status === 'changes-required' || product.status === 'approved' || !product.status) {
+        product.status = 'approved';
+      }
+    } else {
+      product.status = updates.status;
+    }
+  } else {
     product.status = 'pending';
   }
 
@@ -1126,7 +1155,7 @@ exports.updateBatchItem = asyncHandler(async (req, res) => {
     if (updates.subcategory) batch.items[itemIndex].subcategory = product.subcategory;
     if (updates.city) batch.items[itemIndex].city = product.city;
     if (updates.area || updates.location) batch.items[itemIndex].area = product.area || product.location;
-    if (updates.status) batch.items[itemIndex].status = product.status;
+    batch.items[itemIndex].status = product.status;
     if (Array.isArray(updates.images)) batch.items[itemIndex].images = product.images;
     if (updates.video !== undefined || updates.videoUrl !== undefined) {
       batch.items[itemIndex].video = product.video || product.videoUrl || '';

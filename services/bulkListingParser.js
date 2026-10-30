@@ -243,15 +243,16 @@ function mapHeaderToKey(header) {
  */
 function normalizePropertyType(type, sheetName = '') {
   const combined = `${type || ''} ${sheetName || ''}`.trim().toLowerCase();
-  if (combined.includes('flat') || combined.includes('apartment')) return 'Flat/Villa';
+  if (!combined) return 'Plot';
+  if (combined.includes('flat') || combined.includes('apartment') || combined.includes('villa')) return 'Flat';
+  if (combined.includes('plot') || combined.includes('layout') || combined.includes('plat') || combined.includes('site')) return 'Plot';
+  if (combined.includes('land') && !combined.includes('agri')) return 'Land';
   if (
     combined.includes('independent') ||
-    combined.includes('house') ||
-    (combined.includes('villa') && !combined.includes('flat'))
+    combined.includes('house')
   ) {
     return 'Independent House';
   }
-  if (combined.includes('plot') || (combined.includes('land') && !combined.includes('agri'))) return 'Plot/Land';
   if (combined.includes('agri') || combined.includes('farm') || combined.includes('plantation')) return 'Agricultural';
   if (
     combined.includes('comm') ||
@@ -270,8 +271,8 @@ function normalizePropertyType(type, sheetName = '') {
   ) {
     return 'Industrial';
   }
-  if (combined.includes('layout') || combined.includes('residential')) return 'Residential';
-  return 'Residential';
+  if (combined.includes('residen')) return 'Residential';
+  return 'Plot';
 }
 
 /**

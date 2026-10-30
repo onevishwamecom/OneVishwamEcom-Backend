@@ -3,6 +3,7 @@ const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { resolveGoogleMapsUrl } = require('../utils/googleMapsResolver');
+const { recordProductAddition } = require('../services/announcementService');
 
 /**
  * Property Intake Controller
@@ -375,6 +376,12 @@ const updatePropertyStatus = asyncHandler(async (req, res) => {
 
   property.status = status;
   await property.save();
+
+  if (status === 'approved') {
+    recordProductAddition('properties', 1).catch((err) =>
+      console.error('Failed to log property announcement:', err.message)
+    );
+  }
 
   new ApiResponse(
     200,

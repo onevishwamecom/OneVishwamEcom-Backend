@@ -1,4 +1,4 @@
-const { PROPERTY_TYPES } = require('../models/Property');
+const { PROPERTY_TYPES, normalizeCanonicalPropertyType } = require('../models/Property');
 const ApiError = require('../utils/ApiError');
 
 // Defined allowed keys per property category inside the `details` subdocument
@@ -156,6 +156,17 @@ const CATEGORY_REQUIRED_KEYS = {
   Industrial: ['industrialType', 'totalLandArea', 'expectedPrice'],
 };
 
+CATEGORY_ALLOWED_KEYS['Flat / Villa'] = CATEGORY_ALLOWED_KEYS['Flat/Villa'];
+CATEGORY_ALLOWED_KEYS['Plot / Land'] = CATEGORY_ALLOWED_KEYS['Plot/Land'];
+CATEGORY_ALLOWED_KEYS['Flat'] = CATEGORY_ALLOWED_KEYS['Flat/Villa'];
+CATEGORY_ALLOWED_KEYS['Plot'] = CATEGORY_ALLOWED_KEYS['Plot/Land'];
+CATEGORY_ALLOWED_KEYS['Land'] = CATEGORY_ALLOWED_KEYS['Plot/Land'];
+CATEGORY_REQUIRED_KEYS['Flat / Villa'] = CATEGORY_REQUIRED_KEYS['Flat/Villa'];
+CATEGORY_REQUIRED_KEYS['Plot / Land'] = CATEGORY_REQUIRED_KEYS['Plot/Land'];
+CATEGORY_REQUIRED_KEYS['Flat'] = CATEGORY_REQUIRED_KEYS['Flat/Villa'];
+CATEGORY_REQUIRED_KEYS['Plot'] = CATEGORY_REQUIRED_KEYS['Plot/Land'];
+CATEGORY_REQUIRED_KEYS['Land'] = CATEGORY_REQUIRED_KEYS['Plot/Land'];
+
 /**
  * Validates the incoming property payload dynamically based on propertyType.
  * Strips any unwanted fields in req.body.details that do not belong to the selected category.
@@ -184,7 +195,12 @@ function validatePropertyListing(req, res, next) {
   }
 
   // Tier 1 Validation: Root Identifiers
-  const { vendorName, channelPartnerName, propertyType, bankLoanDetails } = req.body;
+  const rawPropType = req.body.propertyType || req.body.subcategory;
+  const propertyType = rawPropType ? normalizeCanonicalPropertyType(rawPropType) : '';
+  req.body.propertyType = propertyType;
+  delete req.body.subcategory;
+
+  const { vendorName, channelPartnerName, bankLoanDetails } = req.body;
 
   if (!vendorName || typeof vendorName !== 'string' || !vendorName.trim()) {
     errors.vendorName = 'Vendor / Builder / Owner name is required';
@@ -194,9 +210,9 @@ function validatePropertyListing(req, res, next) {
     errors.channelPartnerName = 'Channel Partner name is required';
   }
 
-  if (!propertyType || typeof propertyType !== 'string') {
+  if (!propertyType) {
     errors.propertyType = 'Property type is required';
-  } else if (!PROPERTY_TYPES.includes(propertyType.trim())) {
+  } else if (!PROPERTY_TYPES.includes(propertyType)) {
     errors.propertyType = `Invalid propertyType. Must be one of: ${PROPERTY_TYPES.join(', ')}`;
   }
 

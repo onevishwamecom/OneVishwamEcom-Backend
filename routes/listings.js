@@ -9,6 +9,7 @@ const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
 const router = express.Router();
 
 const { CATEGORY_TO_MODULE, findModule, normalizeCategory } = require('../config/constants');
+const { normalizeCanonicalPropertyType } = require('../models/Property');
 
 // Status constants
 const LISTER_ALLOWED_STATUSES = ['pending', 'changes-required'];
@@ -122,6 +123,13 @@ router.post('/', protect, asyncHandler(async (req, res) => {
     }
   }
 
+  if (mod.id === 'properties') {
+    const rawType = body.propertyType || body.subcategory || data.propertyType || data.subcategory;
+    data.propertyType = normalizeCanonicalPropertyType(rawType);
+    delete data.subcategory;
+    delete body.subcategory;
+  }
+
   const mongoose = require('mongoose');
   const isValidObjectId = (val) => val && mongoose.Types.ObjectId.isValid(String(val));
   const ownerId = isValidObjectId(req.auth?.id)
@@ -182,7 +190,14 @@ router.post('/', protect, asyncHandler(async (req, res) => {
 }));
 
 function isOwnerOrAdmin(item, req) {
-  if (req.auth?.role === 'admin' || req.auth?.accountType === 'admin') return;
+  const isAdmin = Boolean(
+    req.auth?.role === 'admin' ||
+    req.auth?.role === 'super-admin' ||
+    req.auth?.accountType === 'admin' ||
+    req.user?.role === 'admin' ||
+    req.user?.role === 'super-admin'
+  );
+  if (isAdmin) return;
   const authId = req.auth?.id ? String(req.auth.id) : null;
   const userId = req.user?._id ? String(req.user._id) : null;
   const userEmail = req.auth?.email || req.user?.email || '';
@@ -225,8 +240,16 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   if (!item) throw new ApiError(404, 'Listing not found');
   isOwnerOrAdmin(item, req);
 
+  const isAdmin = Boolean(
+    req.auth?.role === 'admin' ||
+    req.auth?.role === 'super-admin' ||
+    req.auth?.accountType === 'admin' ||
+    req.user?.role === 'admin' ||
+    req.user?.role === 'super-admin'
+  );
+
   // Non-admins cannot edit cancelled listings
-  if (req.auth.role !== 'admin') {
+  if (!isAdmin) {
     canListerEdit(item, req);
   }
 
@@ -235,12 +258,26 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
   delete body.user;
   delete body.lister;
   delete body._type;
-  // When a lister edits any product/listing, revert status to 'pending' so admin can review and approve it
-  if (req.auth.role !== 'admin') {
+  // When a lister edits any product/listing, revert status to 'pending' so admin can review and approve it.
+  // When an admin edits anything, it should NOT become pending status; let it be in approved.
+  if (!isAdmin) {
     item.status = 'pending';
     item.adminComment = null;
     item.markModified('status');
     delete body.status;
+  } else {
+    if (body.status === 'pending' || !body.status) {
+      if (item.status === 'pending' || item.status === 'changes-required' || item.status === 'approved' || !item.status) {
+        item.status = 'approved';
+        body.status = 'approved';
+      } else {
+        body.status = item.status;
+      }
+    } else {
+      item.status = body.status;
+    }
+    item.adminComment = null;
+    item.markModified('status');
   }
 
   // Enforce maximum 5 images across all categories; direct web links bypass Firebase Storage
@@ -257,6 +294,31 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
 
   const wasApproved = item.status === 'approved';
   const wasCancelled = item.status === 'cancelled' || item.status === 'rejected';
+
+  if (mod.id === 'properties') {
+    const rawType = body.propertyType || body.subcategory || item.propertyType || item.subcategory;
+    if (rawType) {
+      const canonicalType = normalizeCanonicalPropertyType(rawType);
+      body.propertyType = canonicalType;
+      item.propertyType = canonicalType;
+      if (item.details && typeof item.details === 'object') {
+        item.details.propertyType = canonicalType;
+      }
+      if (body.details && typeof body.details === 'object') {
+        body.details.propertyType = canonicalType;
+      }
+    }
+    delete body.subcategory;
+    if (item.subcategory !== undefined) {
+      item.set('subcategory', undefined);
+    }
+    if (item._doc && 'subcategory' in item._doc) {
+      delete item._doc.subcategory;
+    }
+    item.markModified('propertyType');
+    item.markModified('details');
+  }
+
   Object.assign(item, body);
   if (Array.isArray(body.images)) {
     item.markModified('images');

@@ -61,7 +61,7 @@ const refreshLimiter = rateLimit({
 // Mandatory sync route - writes & updates authoritative copy in MongoDB Atlas
 router.post('/sync', verifyFirebaseToken, async (req, res) => {
   try {
-    const { name, fullName, phoneNumber, mobile, role, avatar, profileImage, city, area, pincode, firebaseUid: bodyUid, email: bodyEmail } = req.body;
+    const { name, fullName, phoneNumber, mobile, phone: bodyPhone, role, avatar, profileImage, city, area, pincode, firebaseUid: bodyUid, email: bodyEmail } = req.body;
     const uid = req.firebaseClaims?.uid || req.user?.firebaseUid || (process.env.NODE_ENV !== 'production' ? bodyUid : null);
     const email = req.firebaseClaims?.email || req.user?.email || (process.env.NODE_ENV !== 'production' ? bodyEmail : null);
 
@@ -72,31 +72,29 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    const phone = phoneNumber || mobile;
+    const phone = phoneNumber || mobile || bodyPhone || req.body.phone;
     const cleanEmail = email ? email.toLowerCase().trim() : undefined;
-    const cleanPhone = phone ? phone.trim() : undefined;
+    const cleanPhone = phone ? String(phone).trim() : undefined;
 
-    // Check if account already exists as a Lister in MongoDB Atlas
-    const existingLister = uid || cleanEmail ? await Lister.findOne({
-      $or: [
-        ...(uid ? [{ firebaseUid: uid }] : []),
-        ...(cleanEmail ? [{ email: cleanEmail }] : []),
-      ],
-    }) : null;
+    // Determine whether caller is targeting Lister or User
+    const clientRoleHeader = (
+      req.headers['x-client-role'] ||
+      req.headers['x-account-type'] ||
+      ''
+    ).toLowerCase();
+    const explicitRole = (role || '').toLowerCase();
 
-    const isLister = role === 'lister' || Boolean(existingLister) || req.auth?.accountType === 'lister' || req.user?.role === 'lister';
+    // Priority:
+    // 1. If explicitRole is 'user' or clientRoleHeader is 'user' -> DEFINITELY a USER (users collection)
+    // 2. If explicitRole is 'lister' -> LISTER (listers collection)
+    // 3. If clientRoleHeader is 'lister' and explicitRole is not 'user' -> LISTER
+    // 4. Default: USER (all consumer site logins/registrations go to users collection)
+    const isUserExplicit = explicitRole === 'user' || clientRoleHeader === 'user';
+    const isLister = !isUserExplicit && (explicitRole === 'lister' || clientRoleHeader === 'lister');
 
     if (isLister) {
       const bodyName = (name || fullName || req.body.displayName)?.trim();
       const displayName = bodyName || req.user?.name || req.user?.fullName || (cleanEmail ? cleanEmail.split('@')[0] : 'Lister');
-
-      // Clean up any accidental duplicate in User collection (users)
-      if (uid || cleanEmail) {
-        const deleteConditions = [];
-        if (uid) deleteConditions.push({ firebaseUid: uid });
-        if (cleanEmail) deleteConditions.push({ email: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') });
-        await User.deleteMany({ $or: deleteConditions }).catch(() => null);
-      }
 
       let lister = await Lister.findOne({
         $or: [
@@ -146,15 +144,34 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       });
     }
 
+    // Clean up any accidental orphan record in Lister collection for this user
+    // (e.g. created accidentally without phone or where listerId matches firebaseUid)
+    if (uid || cleanEmail) {
+      await Lister.deleteMany({
+        $or: [
+          ...(uid ? [{ firebaseUid: uid }] : []),
+          ...(cleanEmail ? [{ email: cleanEmail }] : []),
+        ],
+        $and: [
+          {
+            $or: [
+              { phone: { $in: [null, '', undefined] } },
+              ...(uid ? [{ listerId: uid }] : []),
+            ],
+          },
+        ],
+      }).catch(() => null);
+    }
+
     const resolvedName = (name || fullName || req.body.displayName)?.trim();
     const resolvedImage = profileImage || avatar;
     const now = new Date();
     const updateFields = {
       firebaseUid: uid,
-      ...(email && { email: email.toLowerCase().trim() }),
+      ...(cleanEmail && { email: cleanEmail }),
       ...(resolvedName && { name: resolvedName, fullName: resolvedName }),
-      ...(phone && { phoneNumber: phone.trim(), phone: phone.trim(), mobile: phone.trim() }),
-      ...(role && ['user', 'lister'].includes(role) && { role }),
+      ...(cleanPhone && { phoneNumber: cleanPhone }),
+      role: 'user',
       ...(resolvedImage && { avatar: resolvedImage, profileImage: resolvedImage }),
       ...(city && { city }),
       ...(area && { area }),
@@ -164,6 +181,28 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       lastLogin: now,
       lastActiveAt: now,
     };
+
+    // Check if another account with this email already exists to merge and prevent E11000 duplicate key error
+    if (cleanEmail) {
+      const userWithEmail = await User.findOne({
+        email: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+      });
+
+      if (userWithEmail && userWithEmail.firebaseUid !== uid) {
+        await User.deleteMany({ firebaseUid: uid, _id: { $ne: userWithEmail._id } }).catch(() => null);
+        Object.assign(userWithEmail, updateFields);
+        userWithEmail.firebaseUid = uid;
+        userWithEmail.loginCount = (userWithEmail.loginCount || 0) + 1;
+        await userWithEmail.save({ validateBeforeSave: false });
+
+        console.log(`[Auth Sync] Successfully merged user with email ${cleanEmail} to firebaseUid ${uid}`);
+        return res.status(200).json({
+          success: true,
+          message: 'User profile linked and saved successfully',
+          data: userWithEmail.toProfileJSON ? userWithEmail.toProfileJSON() : userWithEmail,
+        });
+      }
+    }
 
     // Check if another account with this phone already exists to merge or prevent unhandled E11000 duplicate key error
     if (cleanPhone) {
@@ -209,6 +248,7 @@ router.post('/sync', verifyFirebaseToken, async (req, res) => {
       { firebaseUid: uid },
       {
         $set: updateFields,
+        $unset: { phone: 1, mobile: 1 },
         $inc: { loginCount: 1 },
       },
       { new: true, upsert: true, setDefaultsOnInsert: true }
@@ -288,25 +328,49 @@ router.get('/me', verifyFirebaseToken, async (req, res) => {
     let account = req.user;
     const uid = req.firebaseClaims?.uid || req.user?.firebaseUid;
     const email = (req.firebaseClaims?.email || req.user?.email || '').toLowerCase();
+    const clientRole = (
+      req.headers['x-client-role'] ||
+      req.headers['x-account-type'] ||
+      ''
+    ).toLowerCase();
 
-    if (uid && (!account || !account._id)) {
-      account = (await Lister.findOne({ firebaseUid: uid })) ||
-                (await User.findOne({ firebaseUid: uid }));
-    }
-
-    if (!account && email) {
-      account = (await Lister.findOne({ email })) ||
-                (await User.findOne({ email }));
+    if (clientRole === 'lister') {
+      if (uid && (!account || !account._id || account.role !== 'lister' || !account.toListerJSON)) {
+        account = (await Lister.findOne({ firebaseUid: uid })) ||
+                  (await User.findOne({ firebaseUid: uid }));
+      }
+      if ((!account || account.role !== 'lister' || !account.toListerJSON) && email) {
+        account = (await Lister.findOne({ email: new RegExp('^' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') })) ||
+                  (await User.findOne({ email: new RegExp('^' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }));
+        if (account && uid && !account.firebaseUid) {
+          account.firebaseUid = uid;
+          await account.save({ validateBeforeSave: false }).catch(() => null);
+        }
+      }
+    } else {
+      // Default / clientRole === 'user': Prioritize User collection
+      if (uid && (!account || !account._id || account.role !== 'user' || !account.toProfileJSON)) {
+        account = (await User.findOne({ firebaseUid: uid })) ||
+                  (await Lister.findOne({ firebaseUid: uid }));
+      }
+      if ((!account || account.role !== 'user' || !account.toProfileJSON) && email) {
+        account = (await User.findOne({ email: new RegExp('^' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') })) ||
+                  (await Lister.findOne({ email: new RegExp('^' + email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }));
+        if (account && uid && !account.firebaseUid) {
+          account.firebaseUid = uid;
+          await account.save({ validateBeforeSave: false }).catch(() => null);
+        }
+      }
     }
 
     if (!account) {
       return res.status(404).json({ success: false, message: 'User not found in MongoDB' });
     }
 
-    const responseData = account.toListerJSON
-      ? account.toListerJSON()
-      : account.toProfileJSON
+    const responseData = account.toProfileJSON
       ? account.toProfileJSON()
+      : account.toListerJSON
+      ? account.toListerJSON()
       : account;
 
     return res.status(200).json({
