@@ -22,7 +22,7 @@ class JewelleryService extends BaseService {
         weightGrams: { min: 'weightMin', max: 'weightMax' },
       },
       defaultSort: { createdAt: -1 },
-      defaultFilter: { status: { $in: ['approved', 'active'] } },
+      defaultFilter: { status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } },
       ownerField: 'user',
     });
   }

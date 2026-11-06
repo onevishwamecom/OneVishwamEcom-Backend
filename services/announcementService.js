@@ -2,7 +2,10 @@ const Announcement = require('../models/Announcement');
 
 const CATEGORY_LABELS = {
   properties: 'Properties',
-  automobile: 'Vehicles',
+  automobile: 'Automobiles',
+  automobiles: 'Automobiles',
+  vehicles: 'Automobiles',
+  vehicle: 'Automobiles',
   'consumer-electronics': 'Electronics',
   electronics: 'Electronics',
   'bedding-comfort': 'Bedding Products',

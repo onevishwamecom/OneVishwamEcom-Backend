@@ -86,7 +86,7 @@ function deriveFields(data) {
 }
 
 function buildFilter(query) {
-  const filter = { status: { $in: ['approved', 'active'] } };
+  const filter = { status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } };
   const reserved = [
     'q', 'page', 'limit', 'sort', 'sortBy', 'search',
     'loanTypes', 'amountMin', 'amountMax', 'interestMin', 'interestMax', 'tenure',
@@ -189,7 +189,7 @@ const getAll = async (query) => {
 };
 
 const getById = async (id) => {
-  const item = await Finance.findOne({ _id: id, status: { $in: ['approved', 'active'] } });
+  const item = await Finance.findOne({ _id: id, status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } });
   if (!item) throw new ApiError(404, 'Service not found');
   return item;
 };

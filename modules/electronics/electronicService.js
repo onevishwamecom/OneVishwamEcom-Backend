@@ -16,7 +16,7 @@ class ElectronicService extends BaseService {
       defaultSort: { createdAt: -1 },
       defaultFilter: {
         status: { $in: ['approved', 'active'] },
-        availabilityStatus: { $in: ['available', 'sold_out'] },
+        availabilityStatus: { $ne: 'sold_out' },
       },
       ownerField: 'user',
     });

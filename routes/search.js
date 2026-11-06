@@ -91,7 +91,7 @@ const MODULE_SEARCH_CONFIGS = {
         title,
         subtitle,
         category: 'vehicles',
-        categoryLabel: 'Vehicles',
+        categoryLabel: 'Automobiles',
         brand: item.brand || '',
         model: item.model || '',
         price: item.price || (item.numericPrice ? `₹ ${item.numericPrice.toLocaleString('en-IN')}` : 'Price on Request'),
@@ -235,6 +235,7 @@ async function handleSearch(req, res) {
           { approvalStatus: 'approved' },
           { status: { $exists: false } },
         ],
+        availabilityStatus: { $ne: 'sold_out' },
       };
 
       // City filter (if provided and not 'all')

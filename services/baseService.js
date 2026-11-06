@@ -23,7 +23,7 @@ class BaseService {
     searchFields = [],
     rangeFilters = {},
     defaultSort = { createdAt: -1 },
-    defaultFilter = { status: { $in: ['approved', 'active'] }, availabilityStatus: { $in: ['available', 'sold_out'] } },
+    defaultFilter = { status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } },
     ownerField = 'user',
     cacheCapacity = 300,
     cacheTtlMs = 60000,
@@ -46,8 +46,11 @@ class BaseService {
    * Standard pagination calculation
    */
   paginate(page = 1, limit = 20) {
+    if (limit === 'all' || limit === '0' || Number(limit) === 0) {
+      return { skip: 0, page: 1, limit: 0 };
+    }
     const p = Math.max(1, Number(page) || 1);
-    const l = Math.min(100, Math.max(1, Number(limit) || 20));
+    const l = Math.min(1000, Math.max(1, Number(limit) || 20));
     return { skip: (p - 1) * l, page: p, limit: l };
   }
 
@@ -55,6 +58,16 @@ class BaseService {
    * Standard pagination metadata envelope
    */
   buildPagination(page, limit, total) {
+    if (!limit || limit === 0) {
+      return {
+        page: 1,
+        limit: total,
+        totalItems: total,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      };
+    }
     const totalPages = Math.ceil(total / limit) || 1;
     return {
       page,

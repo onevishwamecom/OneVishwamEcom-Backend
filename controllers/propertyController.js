@@ -115,6 +115,100 @@ const createProperty = asyncHandler(async (req, res) => {
   ).send(res);
 });
 
+const resolvePropertyLocality = (p) => {
+  if (!p) return '';
+  let locality = (p.locality || p.details?.locality || '').trim();
+  if (locality && !/^bangalore$/i.test(locality) && !/^bengaluru$/i.test(locality)) {
+    return locality;
+  }
+  const combined = `${p.title || ''} ${p.subtitle || ''} ${p.vendorName || ''} ${p.address || ''}`.toLowerCase();
+  if (combined.includes('nelamangala') || combined.includes('bmrda')) return 'Nelamangala';
+  if (combined.includes('kempegowda layout') || combined.includes('nada prabhu') || combined.includes('bda')) return 'Nada Prabhu Kempegowda Layout';
+  if (combined.includes('kanakapura') || combined.includes('annanta') || combined.includes('avaana') || combined.includes('oraiyan')) return 'Kanakapura Road';
+  if (combined.includes('begur') || combined.includes('bbmp enclave') || combined.includes('sp prime')) return 'Begur';
+  if (combined.includes('electronic city') || combined.includes('e-city') || combined.includes('showroom')) return 'Electronic City';
+  if (combined.includes('sarjapur')) return 'Sarjapur Road';
+  if (combined.includes('whitefield') || combined.includes('fortuna')) return 'Whitefield';
+  if (combined.includes('devanahalli') || combined.includes('artemis')) return 'Devanahalli';
+  if (combined.includes('yelahanka')) return 'Yelahanka';
+  if (combined.includes('thanisandra')) return 'Thanisandra';
+  if (combined.includes('kengeri') || combined.includes('sampada')) return 'Kengeri';
+  if (combined.includes('bidadi') || combined.includes('bhoo vaibhav')) return 'Bidadi';
+  if (combined.includes('dobbaspet') || combined.includes('dhabaspet')) return 'Dobbaspet';
+  if (combined.includes('gottigere') || combined.includes('vedanth')) return 'Gottigere';
+  if (combined.includes('jigani')) return 'Jigani';
+  return locality;
+};
+
+const formatResolvedLocation = (p) => {
+  const address = (p.address || '').trim();
+  const locality = resolvePropertyLocality(p);
+  const rawCity = (p.city || p.details?.city || 'Bangalore').trim();
+  const city = /^\d+$/.test(rawCity) ? 'Bangalore' : (/^bengaluru$/i.test(rawCity) ? 'Bangalore' : rawCity);
+  const cleanAddr = address.toLowerCase();
+  const isAddressJustCity = !address || cleanAddr === 'bangalore' || cleanAddr === 'bengaluru' || cleanAddr === city.toLowerCase();
+
+  let resolvedLocation = address;
+  if (!resolvedLocation || isAddressJustCity) {
+    resolvedLocation = [locality, city].filter(Boolean).join(', ');
+  } else if (locality && !resolvedLocation.toLowerCase().includes(locality.toLowerCase())) {
+    resolvedLocation = `${locality}, ${resolvedLocation}`;
+  }
+  return resolvedLocation || locality || city || 'Bangalore';
+};
+
+const cleanPropertyOutput = (p) => {
+  if (!p || typeof p !== 'object') return p;
+  const cleanP = { ...p };
+
+  // Remove legacy map duplicate keys
+  delete cleanP.locationUrl;
+  delete cleanP.googleMapsUrl;
+  delete cleanP.googleMapUrl;
+  delete cleanP.mapEmbedUrl;
+  delete cleanP.resolvedLocationUrl;
+
+  // Remove redundant user/lister aliases
+  delete cleanP.user;
+  delete cleanP.lister;
+  if (cleanP.contributor?.listerId && cleanP.listerId === cleanP.contributor.listerId) {
+    delete cleanP.listerId;
+  }
+
+  // Remove redundant media/virtual aliases
+  delete cleanP.video;
+  delete cleanP.videos;
+  delete cleanP.brochure;
+  delete cleanP.email;
+  delete cleanP.rawPrice;
+  delete cleanP.isPriority;
+
+  // Clean details subdocument duplicates
+  if (cleanP.details && typeof cleanP.details === 'object') {
+    cleanP.details = { ...cleanP.details };
+    delete cleanP.details.mapUrl;
+    delete cleanP.details.locationUrl;
+    delete cleanP.details.googleMapsUrl;
+    delete cleanP.details.googleMapUrl;
+    delete cleanP.details.mapEmbedUrl;
+    delete cleanP.details.resolvedLocationUrl;
+
+    if (cleanP.details.propertyName === cleanP.title) delete cleanP.details.propertyName;
+    if (cleanP.details.expectedPrice === cleanP.price) delete cleanP.details.expectedPrice;
+    if (cleanP.details.possessionStatus === cleanP.possessionStatus) delete cleanP.details.possessionStatus;
+    if (cleanP.details.vendorName === cleanP.vendorName) delete cleanP.details.vendorName;
+    if (cleanP.details.channelPartnerName === cleanP.channelPartnerName) delete cleanP.details.channelPartnerName;
+    if (cleanP.details.approvalAuthority === cleanP.approval) delete cleanP.details.approvalAuthority;
+  }
+
+  // Remove subtitle if identical to vendorName or channelPartnerName
+  if (cleanP.subtitle && (cleanP.subtitle === cleanP.vendorName || cleanP.subtitle === cleanP.channelPartnerName)) {
+    delete cleanP.subtitle;
+  }
+
+  return cleanP;
+};
+
 // @desc    Get paginated property listings with filters
 // @route   GET /api/properties
 // @access  Public / Private
@@ -180,100 +274,6 @@ const getProperties = asyncHandler(async (req, res) => {
       .lean(),
     Property.countDocuments(filter),
   ]);
-
-  const resolvePropertyLocality = (p) => {
-    if (!p) return '';
-    let locality = (p.locality || p.details?.locality || '').trim();
-    if (locality && !/^bangalore$/i.test(locality) && !/^bengaluru$/i.test(locality)) {
-      return locality;
-    }
-    const combined = `${p.title || ''} ${p.subtitle || ''} ${p.vendorName || ''} ${p.address || ''}`.toLowerCase();
-    if (combined.includes('nelamangala') || combined.includes('bmrda')) return 'Nelamangala';
-    if (combined.includes('kempegowda layout') || combined.includes('nada prabhu') || combined.includes('bda')) return 'Nada Prabhu Kempegowda Layout';
-    if (combined.includes('kanakapura') || combined.includes('annanta') || combined.includes('avaana') || combined.includes('oraiyan')) return 'Kanakapura Road';
-    if (combined.includes('begur') || combined.includes('bbmp enclave') || combined.includes('sp prime')) return 'Begur';
-    if (combined.includes('electronic city') || combined.includes('e-city') || combined.includes('showroom')) return 'Electronic City';
-    if (combined.includes('sarjapur')) return 'Sarjapur Road';
-    if (combined.includes('whitefield') || combined.includes('fortuna')) return 'Whitefield';
-    if (combined.includes('devanahalli') || combined.includes('artemis')) return 'Devanahalli';
-    if (combined.includes('yelahanka')) return 'Yelahanka';
-    if (combined.includes('thanisandra')) return 'Thanisandra';
-    if (combined.includes('kengeri') || combined.includes('sampada')) return 'Kengeri';
-    if (combined.includes('bidadi') || combined.includes('bhoo vaibhav')) return 'Bidadi';
-    if (combined.includes('dobbaspet') || combined.includes('dhabaspet')) return 'Dobbaspet';
-    if (combined.includes('gottigere') || combined.includes('vedanth')) return 'Gottigere';
-    if (combined.includes('jigani')) return 'Jigani';
-    return locality;
-  };
-
-  const formatResolvedLocation = (p) => {
-    const address = (p.address || '').trim();
-    const locality = resolvePropertyLocality(p);
-    const rawCity = (p.city || p.details?.city || 'Bangalore').trim();
-    const city = /^\d+$/.test(rawCity) ? 'Bangalore' : (/^bengaluru$/i.test(rawCity) ? 'Bangalore' : rawCity);
-    const cleanAddr = address.toLowerCase();
-    const isAddressJustCity = !address || cleanAddr === 'bangalore' || cleanAddr === 'bengaluru' || cleanAddr === city.toLowerCase();
-
-    let resolvedLocation = address;
-    if (!resolvedLocation || isAddressJustCity) {
-      resolvedLocation = [locality, city].filter(Boolean).join(', ');
-    } else if (locality && !resolvedLocation.toLowerCase().includes(locality.toLowerCase())) {
-      resolvedLocation = `${locality}, ${resolvedLocation}`;
-    }
-    return resolvedLocation || locality || city || 'Bangalore';
-  };
-
-  const cleanPropertyOutput = (p) => {
-    if (!p || typeof p !== 'object') return p;
-    const cleanP = { ...p };
-
-    // Remove legacy map duplicate keys
-    delete cleanP.locationUrl;
-    delete cleanP.googleMapsUrl;
-    delete cleanP.googleMapUrl;
-    delete cleanP.mapEmbedUrl;
-    delete cleanP.resolvedLocationUrl;
-
-    // Remove redundant user/lister aliases
-    delete cleanP.user;
-    delete cleanP.lister;
-    if (cleanP.contributor?.listerId && cleanP.listerId === cleanP.contributor.listerId) {
-      delete cleanP.listerId;
-    }
-
-    // Remove redundant media/virtual aliases
-    delete cleanP.video;
-    delete cleanP.videos;
-    delete cleanP.brochure;
-    delete cleanP.email;
-    delete cleanP.rawPrice;
-    delete cleanP.isPriority;
-
-    // Clean details subdocument duplicates
-    if (cleanP.details && typeof cleanP.details === 'object') {
-      cleanP.details = { ...cleanP.details };
-      delete cleanP.details.mapUrl;
-      delete cleanP.details.locationUrl;
-      delete cleanP.details.googleMapsUrl;
-      delete cleanP.details.googleMapUrl;
-      delete cleanP.details.mapEmbedUrl;
-      delete cleanP.details.resolvedLocationUrl;
-
-      if (cleanP.details.propertyName === cleanP.title) delete cleanP.details.propertyName;
-      if (cleanP.details.expectedPrice === cleanP.price) delete cleanP.details.expectedPrice;
-      if (cleanP.details.possessionStatus === cleanP.possessionStatus) delete cleanP.details.possessionStatus;
-      if (cleanP.details.vendorName === cleanP.vendorName) delete cleanP.details.vendorName;
-      if (cleanP.details.channelPartnerName === cleanP.channelPartnerName) delete cleanP.details.channelPartnerName;
-      if (cleanP.details.approvalAuthority === cleanP.approval) delete cleanP.details.approvalAuthority;
-    }
-
-    // Remove subtitle if identical to vendorName or channelPartnerName
-    if (cleanP.subtitle && (cleanP.subtitle === cleanP.vendorName || cleanP.subtitle === cleanP.channelPartnerName)) {
-      delete cleanP.subtitle;
-    }
-
-    return cleanP;
-  };
 
   const formattedProperties = properties.map((p) => {
     const loc = formatResolvedLocation(p);

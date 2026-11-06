@@ -35,7 +35,7 @@ class PropertyService extends BaseService {
       defaultSort: { priority: -1, createdAt: -1 },
       defaultFilter: {
         status: { $in: ['approved', 'active', 'available'] },
-        availabilityStatus: { $in: ['available', 'sold_out', null] },
+        availabilityStatus: { $ne: 'sold_out' },
       },
       ownerField: 'user',
     });
@@ -109,7 +109,7 @@ class PropertyService extends BaseService {
       {
         _id: id,
         status: { $in: ['approved', 'active', 'available'] },
-        availabilityStatus: { $in: ['available', 'sold_out', null] },
+        availabilityStatus: { $ne: 'sold_out' },
       },
       { $inc: { viewsCount: 1 } },
       { new: true }
@@ -124,7 +124,7 @@ class PropertyService extends BaseService {
       .find({
         featured: true,
         status: { $in: ['approved', 'active'] },
-        availabilityStatus: { $in: ['available', 'sold_out', null] },
+        availabilityStatus: { $ne: 'sold_out' },
       })
       .sort({ priority: -1, createdAt: -1 })
       .limit(6)
@@ -137,7 +137,7 @@ class PropertyService extends BaseService {
     const items = await this.model
       .find({
         status: { $in: ['approved', 'active'] },
-        availabilityStatus: { $in: ['available', 'sold_out', null] },
+        availabilityStatus: { $ne: 'sold_out' },
       })
       .sort({ priority: -1, createdAt: -1 })
       .limit(l)
@@ -153,7 +153,7 @@ class PropertyService extends BaseService {
       .find({
         _id: { $ne: property._id },
         status: { $in: ['approved', 'active'] },
-        availabilityStatus: { $in: ['available', 'sold_out'] },
+        availabilityStatus: { $ne: 'sold_out' },
         $or: [{ city: property.city }, { area: property.area }],
       })
       .sort({ priority: -1, createdAt: -1 })

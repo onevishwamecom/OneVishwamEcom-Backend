@@ -18,7 +18,7 @@ class VehicleService extends BaseService {
       defaultSort: { createdAt: -1 },
       defaultFilter: {
         status: { $in: ['approved', 'active'] },
-        availabilityStatus: { $in: ['available', 'sold_out'] },
+        availabilityStatus: { $ne: 'sold_out' },
       },
       ownerField: 'user',
     });
@@ -54,6 +54,7 @@ class VehicleService extends BaseService {
         _id: { $ne: id },
         category: vehicle.category,
         status: { $in: ['approved', 'active'] },
+        availabilityStatus: { $ne: 'sold_out' },
       })
       .limit(4)
       .sort({ featured: -1, createdAt: -1 });
