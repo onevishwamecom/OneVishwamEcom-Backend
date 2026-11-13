@@ -40,7 +40,8 @@ const connectDB = async () => {
     return cachedPromise;
   }
 
-  const mongoUri = process.env.ATLAS_MONGODB_URI || process.env.MONGODB_URI;
+  const rawUri = process.env.MONGODB_URI || process.env.ATLAS_MONGODB_URI || process.env.LOCAL_MONGODB_URI || '';
+  const mongoUri = rawUri.trim().replace(/^["']|["']$/g, '');
 
   if (!mongoUri) {
     const errorMsg = "FATAL: MongoDB connection URI is missing. Please define ATLAS_MONGODB_URI or MONGODB_URI in your environment or secrets.";

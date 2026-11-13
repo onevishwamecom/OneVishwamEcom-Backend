@@ -37,6 +37,9 @@ const isAllowedOrigin = (origin) => {
   if (allowedOrigins.includes(origin)) return true;
   if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return true;
   if (/^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return true;
+  if (/^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin)) return true;
+  if (/^http:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/.test(origin)) return true;
+  if (/^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+(:\d+)?$/.test(origin)) return true;
   if (/^https:\/\/([a-zA-Z0-9-]+\.)*onevishwam\.com$/.test(origin)) return true;
   if (/^https:\/\/([a-zA-Z0-9-]+\.)*web\.app$/.test(origin)) return true;
   if (/^https:\/\/([a-zA-Z0-9-]+\.)*firebaseapp\.com$/.test(origin)) return true;
@@ -82,7 +85,17 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'X-Client-Role',
+    'X-Account-Type',
+    'x-client-role',
+    'x-account-type',
+  ],
   exposedHeaders: ['Set-Cookie'],
   maxAge: 86400,
 };
