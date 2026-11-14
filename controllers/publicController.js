@@ -13,7 +13,11 @@ const getBankLoans = asyncHandler(async (req, res) => {
   const query = FinanceOffering.find(filter).sort({ order: 1, createdAt: -1 });
   if (limit) query.limit(Number(limit));
   const loans = await query;
-  new ApiResponse(200, { loans }).send(res);
+  const response = new ApiResponse(200, { loans });
+  if (!req.headers.authorization) {
+    response.setCache(60, 120, 300);
+  }
+  response.send(res);
 });
 
 const createEnquiry = asyncHandler(async (req, res) => {
@@ -24,32 +28,20 @@ const createEnquiry = asyncHandler(async (req, res) => {
       property = await Property.findById(propertyId);
     } catch (e) {}
   }
-  if (!property) {
-    property = await Property.findOne();
-  }
 
   const User = require('../models/User');
-  let toUser = property?.user;
-  if (!toUser) {
-    const defaultUser = await User.findOne();
-    toUser = defaultUser?._id;
-  }
+  let toUser = property?.user || null;
+  let fromUser = req.user?._id || null;
 
-  let fromUser = req.user?._id;
-  if (!fromUser) {
-    if (req.body.email) {
-      const existingUser = await User.findOne({ email: req.body.email });
-      fromUser = existingUser?._id;
-    }
-    if (!fromUser) {
-      fromUser = toUser;
-    }
+  if (!fromUser && req.body.email) {
+    const existingUser = await User.findOne({ email: req.body.email.toLowerCase().trim() });
+    if (existingUser) fromUser = existingUser._id;
   }
 
   const enquiry = await Enquiry.create({
-    listing: property?._id,
-    fromUser: fromUser || toUser,
-    toUser: toUser || fromUser,
+    listing: property?._id || null,
+    fromUser: fromUser || undefined,
+    toUser: toUser || undefined,
     message: req.body.message || 'Interested in this property',
     contactInfo: {
       phone: req.body.phone || req.body.mobile,

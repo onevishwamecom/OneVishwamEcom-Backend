@@ -1,0 +1,32 @@
+module.exports = {
+  name: 'Vehicles',
+  slug: 'vehicles',
+  ownerField: 'lister',
+  searchableFields: ['title', 'subtitle', 'brand', 'make', 'model', 'description', 'city', 'location', 'area'],
+  filterableFields: [
+    'category',
+    'subcategory',
+    'brand',
+    'make',
+    'model',
+    'condition',
+    'fuelType',
+    'transmission',
+    'bodyType',
+    'city',
+    'status',
+    'approvalStatus',
+    'availabilityStatus',
+    'featured',
+  ],
+  rangeFilters: {
+    numericPrice: { min: 'minPrice', max: 'maxPrice' },
+    kmDriven: { min: 'minKm', max: 'maxKm' },
+    year: { min: 'minYear', max: 'maxYear' },
+  },
+  defaultSort: { createdAt: -1 },
+  populate: [
+    { path: 'user', select: 'name email phone avatar' },
+    { path: 'lister', select: 'name email phone businessName' },
+  ],
+};

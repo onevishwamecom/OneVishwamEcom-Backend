@@ -13,12 +13,11 @@ const adminRoutes = require('./admin');
 const homepageRoutes = require('./homepage');
 const wishlistRoutes = require('../modules/wishlist/routes');
 const requirementRoutes = require('../modules/requirements/routes');
-const propertyRoutes = require('./propertyRoutes');
-const propertyRequirementRoutes = require('./propertyRequirements');
-const financeOfferingsRoutes = require('../modules/financeOfferings/routes');
+const propertyRoutes = require('../modules/properties/routes');
+const propertyRequirementRoutes = require('../modules/properties/requirements');
 const bulkListingRoutes = require('./bulkListing');
 const visitorRoutes = require('./visitors');
-const announcementRoutes = require('./announcementRoutes');
+const announcementRoutes = require('./announcements');
 
 const router = express.Router();
 
@@ -37,13 +36,18 @@ router.use('/v1/users', userRoutes);
 router.use('/v1/properties', propertyRoutes);
 router.use('/v1/property-requirements', propertyRequirementRoutes);
 
-// Standard API endpoints
-router.use('/properties', propertyRoutes);
+// Mount all sector modules directly at root (/properties, /vehicles, /groceries, etc.)
+modules.forEach((mod) => router.use(`/${mod.id}`, mod.routes));
 
-// Sector modules (vehicles, groceries, garments, jewellery, finance, electronics, bedding, etc.)
-modules
-  .filter((mod) => mod.id !== 'properties')
-  .forEach((mod) => router.use(`/${mod.id}`, mod.routes));
+// Direct category aliases for convenience
+router.use('/property', propertyRoutes);
+router.use('/vehicle', require('../modules/vehicles/routes'));
+router.use('/automobile', require('../modules/vehicles/routes'));
+router.use('/automobiles', require('../modules/vehicles/routes'));
+router.use('/consumer-electronics', require('../modules/electronics/routes'));
+router.use('/bedding-comfort', require('../modules/bedding/routes'));
+router.use('/grocery', require('../modules/groceries/routes'));
+router.use('/garment', require('../modules/garments/routes'));
 
 router.use('/auth', authRoutes);
 router.use('/auth/lister', listerRoutes);
@@ -51,13 +55,15 @@ router.use('/users', userRoutes);
 router.use('/admin', adminRoutes);
 router.use('/homepage', homepageRoutes);
 router.use('/product', productRoutes);
+router.use('/products', productRoutes);
+router.use('/sectors', productRoutes);
+router.use('/v1/sectors', productRoutes);
 router.use('/search', searchRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/mylistings', mylistingsRoutes);
 router.use('/listings', listingsRoutes);
 router.use('/wishlist', wishlistRoutes);
 router.use('/requirements', requirementRoutes);
-router.use('/finance-offerings', financeOfferingsRoutes);
 router.use('/', publicRoutes);
 
 module.exports = router;

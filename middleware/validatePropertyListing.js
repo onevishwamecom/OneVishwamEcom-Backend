@@ -1,4 +1,4 @@
-const { PROPERTY_TYPES, normalizeCanonicalPropertyType } = require('../models/Property');
+const { PROPERTY_TYPES, normalizeCanonicalPropertyType } = require('../modules/properties/model');
 const ApiError = require('../utils/ApiError');
 
 // Defined allowed keys per property category inside the `details` subdocument

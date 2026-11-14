@@ -9,6 +9,207 @@ const ApiError = require('../utils/ApiError');
 
 const router = express.Router();
 
+/**
+ * @openapi
+ * /upload/images:
+ *   post:
+ *     tags: [Uploads]
+ *     summary: Upload product images
+ *     description: Up to 5 images, 1 MB each. Returns the public URLs ready to store on a listing.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [images]
+ *             properties:
+ *               images:
+ *                 type: array
+ *                 maxItems: 5
+ *                 items: { type: string, format: binary }
+ *     responses:
+ *       200:
+ *         description: Uploaded image URLs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         images: { type: array, items: { type: string, format: uri } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /upload/video:
+ *   post:
+ *     tags: [Uploads]
+ *     summary: Upload a product video
+ *     description: Single `video` file, max 10 MB.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [video]
+ *             properties:
+ *               video: { type: string, format: binary }
+ *     responses:
+ *       200:
+ *         description: Uploaded video URL
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         videoUrl: { type: string, format: uri }
+ *                         videos: { type: array, items: { type: string, format: uri } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /upload/media:
+ *   post:
+ *     tags: [Uploads]
+ *     summary: Upload images and a video together
+ *     description: Up to 10 images plus 1 video (50 MB per file limit) in a single multipart request.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               images:
+ *                 type: array
+ *                 maxItems: 10
+ *                 items: { type: string, format: binary }
+ *               video: { type: string, format: binary }
+ *     responses:
+ *       200:
+ *         description: Uploaded URLs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         images: { type: array, items: { type: string, format: uri } }
+ *                         videos: { type: array, items: { type: string, format: uri } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /upload/floor-plan-images:
+ *   post:
+ *     tags: [Uploads]
+ *     summary: Upload floor-plan images
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               floorPlanImages:
+ *                 type: array
+ *                 maxItems: 10
+ *                 items: { type: string, format: binary }
+ *     responses:
+ *       200: { description: Uploaded URLs, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /upload/floor-plan-pdf:
+ *   post:
+ *     tags: [Uploads]
+ *     summary: Upload a floor-plan PDF
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [floorPlanPdf]
+ *             properties:
+ *               floorPlanPdf: { type: string, format: binary }
+ *     responses:
+ *       200: { description: Uploaded URL, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /upload/floor-plans:
+ *   post:
+ *     tags: [Uploads]
+ *     summary: Upload floor-plan files (alias)
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               floorPlans:
+ *                 type: array
+ *                 maxItems: 10
+ *                 items: { type: string, format: binary }
+ *     responses:
+ *       200: { description: Uploaded URLs, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /upload/brochure:
+ *   post:
+ *     tags: [Uploads]
+ *     summary: Upload a brochure
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [brochure]
+ *             properties:
+ *               brochure: { type: string, format: binary }
+ *     responses:
+ *       200: { description: Uploaded URL, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ */
+
 // POST /upload/images — product images (up to 5, max 1MB each)
 router.post('/images', protect, upload.array('images', 5), (req, res) => {
   if (!req.uploadedFiles || req.uploadedFiles.length === 0) {

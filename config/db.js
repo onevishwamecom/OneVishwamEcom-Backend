@@ -12,8 +12,16 @@ let cachedPromise = null;
 let isBootstrapped = false;
 
 // Proactively handle connection state transitions to prevent dead pool reuse
+mongoose.connection.on("connected", () => {
+  console.log(`✅ [DATABASE] MongoDB connection established (${mongoose.connection.host || 'Atlas'}).`);
+});
+
+mongoose.connection.on("reconnected", () => {
+  console.log("🔄 [DATABASE] MongoDB reconnected successfully.");
+});
+
 mongoose.connection.on("disconnected", () => {
-  console.warn("⚠️ [DATABASE] MongoDB disconnected. Resetting cached connection pool.");
+  console.warn(`⚠️ [DATABASE] MongoDB disconnected (readyState: ${mongoose.connection.readyState}). Resetting cached connection pool.`);
   cachedPromise = null;
   cachedConnection = null;
 });
@@ -50,12 +58,13 @@ const connectDB = async () => {
   }
 
   const opts = {
-    serverSelectionTimeoutMS: 8000,
-    connectTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 15000,
+    connectTimeoutMS: 20000,
     socketTimeoutMS: 45000,
     heartbeatFrequencyMS: 10000,
     maxPoolSize: process.env.MONGO_MAX_POOL_SIZE ? parseInt(process.env.MONGO_MAX_POOL_SIZE, 10) : 10,
-    minPoolSize: 1,
+    minPoolSize: 0,
+    maxIdleTimeMS: 30000,
     autoIndex: false,
   };
 

@@ -306,11 +306,21 @@ const adminOnly = (req, res, next) => {
   next(new ApiError(403, 'Not authorized as admin'));
 };
 
+const listerOnly = (req, res, next) => {
+  const accountType = req.auth?.accountType || req.user?.accountType;
+  const role = req.user?.role || req.auth?.role;
+  if (accountType === 'lister' || role === 'lister' || role === 'admin' || role === 'super-admin' || req.user) {
+    return next();
+  }
+  next(new ApiError(403, 'Lister privileges required'));
+};
+
 module.exports = {
   verifyFirebaseToken,
   protect,
   optionalAuth,
   adminOnly,
+  listerOnly,
   resolveAccountType,
   resolveModel,
 };

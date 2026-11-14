@@ -35,6 +35,13 @@ const CATEGORY_MAP = {
   finance: 'finance',
   'finance-lending': 'finance',
   loans: 'finance',
+  groceries: 'groceries',
+  grocery: 'groceries',
+  garments: 'garments',
+  garment: 'garments',
+  apparel: 'garments',
+  jewellery: 'jewellery',
+  jewelry: 'jewellery',
 };
 
 // Module-specific search fields configuration
@@ -196,6 +203,93 @@ const MODULE_SEARCH_CONFIGS = {
         city: 'bengaluru',
         tags: [item.loanType, 'Instant Approval'].filter(Boolean),
         link: `/finance/${id}`,
+      };
+    },
+  },
+  groceries: {
+    label: 'Groceries',
+    fields: ['name', 'description', 'brand', 'category', 'subcategory'],
+    linkPrefix: '/grocery',
+    normalize: (item) => {
+      const id = item._id || item.id;
+      const title = item.name || 'Grocery Item';
+      const subtitle = [item.brand, item.subcategory, item.unit].filter(Boolean).join(' · ') || 'Groceries';
+      const img = Array.isArray(item.images) && item.images[0]
+        ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0].url)
+        : (item.image || '');
+      return {
+        id,
+        _id: id,
+        title,
+        subtitle,
+        category: 'groceries',
+        categoryLabel: 'Groceries',
+        brand: item.brand || '',
+        price: item.price || (item.numericPrice ? `₹ ${item.numericPrice.toLocaleString('en-IN')}` : 'Market Price'),
+        numericPrice: item.numericPrice || 0,
+        image: img,
+        location: 'Bengaluru',
+        city: 'bengaluru',
+        tags: [item.brand, item.subcategory, item.organic ? 'Organic' : ''].filter(Boolean),
+        link: `/grocery/${id}`,
+      };
+    },
+  },
+  garments: {
+    label: 'Garments & Fashion',
+    fields: ['name', 'description', 'brand', 'category', 'subcategory', 'material', 'color'],
+    linkPrefix: '/garment',
+    normalize: (item) => {
+      const id = item._id || item.id;
+      const title = item.name || 'Fashion & Apparel';
+      const subtitle = [item.brand, item.subcategory, item.size, item.color].filter(Boolean).join(' · ') || 'Garments';
+      const img = Array.isArray(item.images) && item.images[0]
+        ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0].url)
+        : (item.image || '');
+      return {
+        id,
+        _id: id,
+        title,
+        subtitle,
+        category: 'garments',
+        categoryLabel: 'Garments',
+        brand: item.brand || '',
+        price: item.price || (item.numericPrice ? `₹ ${item.numericPrice.toLocaleString('en-IN')}` : 'Price on Request'),
+        numericPrice: item.numericPrice || 0,
+        image: img,
+        location: 'Bengaluru',
+        city: 'bengaluru',
+        tags: [item.brand, item.size, item.gender].filter(Boolean),
+        link: `/garment/${id}`,
+      };
+    },
+  },
+  jewellery: {
+    label: 'Jewellery',
+    fields: ['title', 'name', 'metalType', 'category', 'subcategory', 'description', 'store'],
+    linkPrefix: '/jewellery',
+    normalize: (item) => {
+      const id = item._id || item.id;
+      const title = item.title || item.name || 'Jewellery Ornament';
+      const subtitle = [item.metalType, item.purity, item.subcategory].filter(Boolean).join(' · ') || 'Precious Jewellery';
+      const img = Array.isArray(item.images) && item.images[0]
+        ? (typeof item.images[0] === 'string' ? item.images[0] : item.images[0].url)
+        : (item.image || '');
+      return {
+        id,
+        _id: id,
+        title,
+        subtitle,
+        category: 'jewellery',
+        categoryLabel: 'Jewellery',
+        brand: item.store || '',
+        price: item.price || (item.numericPrice ? `₹ ${item.numericPrice.toLocaleString('en-IN')}` : 'Price on Request'),
+        numericPrice: item.numericPrice || 0,
+        image: img,
+        location: 'Bengaluru',
+        city: 'bengaluru',
+        tags: [item.metalType, item.purity, item.certified ? 'Certified' : ''].filter(Boolean),
+        link: `/jewellery/${id}`,
       };
     },
   },

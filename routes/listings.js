@@ -9,7 +9,7 @@ const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
 const router = express.Router();
 
 const { CATEGORY_TO_MODULE, findModule, normalizeCategory } = require('../config/constants');
-const { normalizeCanonicalPropertyType } = require('../models/Property');
+const { normalizeCanonicalPropertyType } = require('../modules/properties/model');
 
 // Status constants
 const LISTER_ALLOWED_STATUSES = ['pending', 'changes-required'];
@@ -31,6 +31,397 @@ function normalizeListingItem(item) {
     videos: Array.isArray(raw.videos) && raw.videos.length > 0 ? raw.videos : (v ? [v] : []),
   };
 }
+
+/**
+ * @openapi
+ * /listings:
+ *   get:
+ *     tags: [Listings]
+ *     summary: List my listings (grouped)
+ *     description: |
+ *       Returns every sector collection the caller owns, keyed by sector id. With
+ *       `flatten=1` the response is a single array where each item carries `_type`.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: flatten, in: query, schema: { type: string, enum: ['0', '1'], default: '0' } }
+ *     responses:
+ *       200:
+ *         description: Grouped listings, or a flat array when `flatten=1`
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       oneOf:
+ *                         - type: object
+ *                           additionalProperties:
+ *                             type: array
+ *                             items: { $ref: '#/components/schemas/SectorListing' }
+ *                         - type: array
+ *                           items: { $ref: '#/components/schemas/SectorListing' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *   post:
+ *     tags: [Listings]
+ *     summary: Create a listing
+ *     description: |
+ *       Creates a document in the sector implied by `_type` (or `categoryType` /
+ *       `serviceType` / `category`). The server forces `status: pending`, caps images
+ *       at 5 and fills sector-specific defaults.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/SectorListing'
+ *               - type: object
+ *                 required: [_type]
+ *                 properties:
+ *                   _type: { type: string, enum: [properties, vehicles, garments, groceries, jewellery, electronics, bedding, finance] }
+ *                 description: Extend with sector-specific fields (bhk, brand, model, etc.).
+ *     responses:
+ *       201:
+ *         description: Listing created (pending approval)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         item: { $ref: '#/components/schemas/SectorListing' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /listings/{type}/{id}:
+ *   get:
+ *     tags: [Listings]
+ *     summary: Get one listing
+ *     description: Owner or admin only.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ListingType'
+ *       - $ref: '#/components/parameters/ListingId'
+ *     responses:
+ *       200:
+ *         description: Listing
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         item: { $ref: '#/components/schemas/SectorListing' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *   patch:
+ *     tags: [Listings]
+ *     summary: Update a listing
+ *     description: |
+ *       Owner or admin. A non-admin edit resets the status to `pending` for
+ *       re-moderation. Images are capped at 5 per listing.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ListingType'
+ *       - $ref: '#/components/parameters/ListingId'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/SectorListing' }
+ *     responses:
+ *       200:
+ *         description: Updated listing
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         item: { $ref: '#/components/schemas/SectorListing' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *   delete:
+ *     tags: [Listings]
+ *     summary: Delete a listing
+ *     description: Owner or admin. Also removes the listing's uploaded images, videos, documents and brochures.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ListingType'
+ *       - $ref: '#/components/parameters/ListingId'
+ *     responses:
+ *       200: { description: Deleted, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /listings/{type}/{id}/images/reorder:
+ *   patch:
+ *     tags: [Listings]
+ *     summary: Reorder listing images
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/ListingType'
+ *       - $ref: '#/components/parameters/ListingId'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [images]
+ *             properties:
+ *               images:
+ *                 type: array
+ *                 items: { type: string, format: uri }
+ *                 description: Full ordered list of image URLs.
+ *     responses:
+ *       200:
+ *         description: Reordered
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         item: { $ref: '#/components/schemas/SectorListing' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /listings/{id}/images/reorder:
+ *   patch:
+ *     tags: [Listings]
+ *     summary: Reorder listing images (alias)
+ *     description: Same behaviour as `/listings/{type}/{id}/images/reorder`; the type is inferred.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               images: { type: array, items: { type: string, format: uri } }
+ *     responses:
+ *       200: { description: Reordered, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /listings/bulk-upload:
+ *   post:
+ *     tags: [Listings]
+ *     summary: Bulk upload listings from Excel
+ *     description: Multipart upload of an `.xlsx` workbook plus the target `category`. Filename must follow the template naming convention.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file, category]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *               category: { type: string, enum: [properties, vehicles, garments, groceries, jewellery, electronics, bedding, finance] }
+ *     responses:
+ *       200: { description: Upload processed, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /listings/bulk/download-log:
+ *   post:
+ *     tags: [Listings]
+ *     summary: Record a template download
+ *     description: Analytics-only endpoint; requires no authentication.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               category: { type: string }
+ *               filename: { type: string }
+ *               timestamp: { type: string, format: date-time }
+ *     responses:
+ *       200: { description: Logged, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *
+ * /listings/bulk/download-logs:
+ *   get:
+ *     tags: [Listings]
+ *     summary: List template download logs (admin)
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+ *       - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+ *       - { name: category, in: query, schema: { type: string } }
+ *       - { name: search, in: query, schema: { type: string } }
+ *     responses:
+ *       200: { description: Paginated logs, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *
+ * /listings/bulk/batches:
+ *   get:
+ *     tags: [Listings]
+ *     summary: List bulk-upload batches
+ *     description: Admins see every batch; other accounts only see their own.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: category, in: query, schema: { type: string } }
+ *       - { name: status, in: query, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Batches with live item counts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         batches: { type: array, items: { type: object, additionalProperties: true } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /listings/bulk/batches/{batchId}:
+ *   get:
+ *     tags: [Listings]
+ *     summary: Get a bulk-upload batch
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: batchId, in: path, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Batch with items, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *   delete:
+ *     tags: [Listings]
+ *     summary: Delete a bulk-upload batch
+ *     description: Removes the batch and the listings it created.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: batchId, in: path, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Deleted, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *
+ * /listings/bulk/batches/{batchId}/items:
+ *   post:
+ *     tags: [Listings]
+ *     summary: Add an item to a batch
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: batchId, in: path, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title: { type: string }
+ *               name: { type: string }
+ *               price: { type: string }
+ *               subcategory: { type: string }
+ *               city: { type: string }
+ *               area: { type: string }
+ *               description: { type: string }
+ *               images: { type: array, items: { type: string } }
+ *               brand: { type: string }
+ *               model: { type: string }
+ *     responses:
+ *       201: { description: Item added, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *
+ * /listings/bulk/batches/{batchId}/items/{itemId}:
+ *   put:
+ *     tags: [Listings]
+ *     summary: Update a batch item
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: batchId, in: path, required: true, schema: { type: string } }
+ *       - { name: itemId, in: path, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, additionalProperties: true }
+ *     responses:
+ *       200: { description: Updated, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *   delete:
+ *     tags: [Listings]
+ *     summary: Delete a batch item
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: batchId, in: path, required: true, schema: { type: string } }
+ *       - { name: itemId, in: path, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Deleted, content: { 'application/json': { schema: { $ref: '#/components/schemas/Success' } } } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
 
 // GET /api/listings?flatten=1  -> flat array with `_type`
 // GET /api/listings           -> { <moduleId>: [items] }

@@ -1,6 +1,6 @@
 require('dotenv').config();
 const connectDB = require('../config/db');
-const Property = require('../models/Property');
+const Property = require('../modules/properties/model');
 const Vehicle = require('../modules/vehicles/model');
 const Electronic = require('../modules/electronics/model');
 const Bedding = require('../modules/bedding/model');

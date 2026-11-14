@@ -1,15 +1,16 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { protect, optionalAuth } = require('../middleware/auth');
-const validate = require('../middleware/validate');
-const Requirement = require('../modules/requirements/model');
-const ApiResponse = require('../utils/ApiResponse');
-const ApiError = require('../utils/ApiError');
-const asyncHandler = require('../utils/asyncHandler');
+const { protect, optionalAuth } = require('../../middleware/auth');
+const validate = require('../../middleware/validate');
+const Requirement = require('../requirements/model');
+const ApiResponse = require('../../utils/ApiResponse');
+const ApiError = require('../../utils/ApiError');
+const asyncHandler = require('../../utils/asyncHandler');
 
 const router = express.Router();
 
-router.post('/',
+router.post(
+  '/',
   optionalAuth,
   [
     body('requirementType').trim().notEmpty().withMessage('Requirement type is required'),
@@ -45,7 +46,8 @@ router.post('/',
   })
 );
 
-router.get('/me',
+router.get(
+  '/me',
   protect,
   asyncHandler(async (req, res) => {
     const requirements = await Requirement.find({ user: req.user._id, serviceType: 'properties' })

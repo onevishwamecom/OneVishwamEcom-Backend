@@ -1,4 +1,4 @@
-# MongoDB Atlas Live Connection Guide: Vishwam Backend
+# MongoDB Atlas Live Connection Guide: OneVishwam Backend
 
 The live **`onevishwam`** MongoDB Atlas cluster is fully connected and operational!
 
@@ -13,17 +13,25 @@ The live **`onevishwam`** MongoDB Atlas cluster is fully connected and operation
 
 ---
 
-## Active Environment Variable (`Vishwam-Backend/.env`)
+## Active Environment Variable (`OneVishwamEcom-Backend/.env`)
 ```env
 MONGODB_URI=mongodb+srv://onevishwamecom_db_user:<password>@onevishwam.372aojy.mongodb.net/onevishwam?retryWrites=true&w=majority
 ```
 
 ---
 
+## Connection Resilience & Pooling (`config/db.js`)
+* **`minPoolSize: 0`**: Prevents Atlas serverless/shared tiers from dropping or rejecting idle sockets.
+* **`maxIdleTimeMS: 30000`**: Closes sockets idle for >30s cleanly before the cloud provider terminates them.
+* **`serverSelectionTimeoutMS: 15000`**: Prevents hanging on initial connection.
+* **Local Fallback**: Automatically connects to local MongoDB (`mongodb://127.0.0.1:27017/onevishwam`) if network is offline during local dev.
+
+---
+
 ## How to Verify
-Run the dev server in backend:
+Run the server:
 ```bash
-cd "/Users/tejas/Projects/Learn/React JS/Vishwam-Backend"
+cd d:\onevishwam\OneVishwamEcom-Backend
 npm run dev
 ```
 

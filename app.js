@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env.local') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -106,6 +107,49 @@ app.options('*', cors(corsOptions));
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// ─── API documentation (Swagger UI) ────────────────────────────────────────────
+// Mounted before the database middleware and before the API routers so the docs
+// stay available even when MongoDB is unreachable. Disabled in production unless
+// ENABLE_API_DOCS=true is set.
+const docsEnabled =
+  process.env.NODE_ENV !== 'production' || process.env.ENABLE_API_DOCS === 'true';
+
+if (docsEnabled) {
+  // Lazily required so production cold starts do not pay for spec generation.
+  const swaggerUi = require('swagger-ui-express');
+  const swaggerSpec = require('./config/swagger');
+
+  // `/api-docs` for the local server, `/api/api-docs` for the Cloud Function URL
+  // (and Firebase Emulator) path prefixes.
+  const docsPaths = ['/api-docs', '/api/api-docs'];
+
+  // Helmet (registered globally above) has already set a strict CSP that blocks
+  // Swagger UI's inline bootstrap script. Strip that one header for the docs
+  // routes only — every other route keeps the strict policy.
+  app.use(docsPaths, (req, res, next) => {
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('Cross-Origin-Embedder-Policy');
+    next();
+  });
+
+  app.use(
+    docsPaths,
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customSiteTitle: 'OneVishwam API Docs',
+      swaggerOptions: {
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        filter: true,
+        docExpansion: 'none',
+      },
+    })
+  );
+
+  // Raw spec for Postman / Insomnia / Redocly imports.
+  app.get(docsPaths.map((p) => `${p}.json`), (req, res) => res.json(swaggerSpec));
+}
 
 // Firebase Admin SDK — initialise once (no-op if already done by index.js)
 const { getApps, initializeApp: initAdmin } = require('firebase-admin/app');

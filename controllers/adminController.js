@@ -9,7 +9,7 @@ const modules = require('../modules');
 const Lister = require('../models/Lister');
 const { parsePrice } = require('../utils/priceUtils');
 const { deleteMultipleMediaFromStorage } = require('../utils/firebaseStorage');
-const { normalizeCanonicalPropertyType } = require('../models/Property');
+const { normalizeCanonicalPropertyType } = require('../modules/properties/model');
 const { recordProductAddition } = require('../services/announcementService');
 
 // ─── Auth ───────────────────────────────────────────────────────────────────

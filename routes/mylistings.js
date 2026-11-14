@@ -7,6 +7,39 @@ const asyncHandler = require('../utils/asyncHandler');
 
 const router = express.Router();
 
+/**
+ * @openapi
+ * /mylistings:
+ *   get:
+ *     tags: [Listings]
+ *     summary: My listings across sectors
+ *     description: |
+ *       Returns the caller's listings grouped by sector id. When `serviceType` is
+ *       provided the response is `{ <serviceType>: [ ... ] }` for that sector only.
+ *     security:
+ *       - bearerAuth: []
+ *       - firebaseAuth: []
+ *     parameters:
+ *       - { name: serviceType, in: query, schema: { type: string, enum: [properties, vehicles, garments, groceries, jewellery, electronics, bedding, finance] } }
+ *       - { name: status, in: query, schema: { type: string, enum: [pending, approved, changes-required, cancelled, rejected, active, inactive] } }
+ *     responses:
+ *       200:
+ *         description: Listings grouped by sector
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       additionalProperties:
+ *                         type: array
+ *                         items: { $ref: '#/components/schemas/SectorListing' }
+ *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ */
 router.get('/', protect, asyncHandler(async (req, res) => {
   const { serviceType, status } = req.query;
 

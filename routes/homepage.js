@@ -2,15 +2,12 @@ const express = require('express');
 const { optionalAuth } = require('../middleware/auth');
 const ApiResponse = require('../utils/ApiResponse');
 const asyncHandler = require('../utils/asyncHandler');
+const LRUCache = require('../utils/lruCache');
 const modules = require('../modules');
-const Property = require('../modules/properties/model');
-const Vehicle = require('../modules/vehicles/model');
-// Groceries, Garments, Jewellery, Finance, FinanceOfferings are disabled —
-// only Properties and Vehicles are active.
 
 const router = express.Router();
+const homepageCache = new LRUCache(5, 30000); // 30-second in-memory LRU cache for high-scale throughput
 
-// Card-level projection — only fields needed by homepage cards
 // Card-level projection — only fields needed by homepage cards
 const CARD_PROJECTION = {
   title: 1,
@@ -66,7 +63,6 @@ const CARD_PROJECTION = {
   logo: 1,
   banner: 1,
 };
-
 
 function resolvePropertyLocality(p) {
   if (!p) return '';
@@ -128,6 +124,23 @@ function formatPropertyCard(p) {
 
 // GET /api/homepage — single endpoint returning all homepage sections
 router.get('/', optionalAuth, asyncHandler(async (req, res) => {
+  const cached = homepageCache.get('homepage_data');
+  if (cached) {
+    const response = new ApiResponse(200, cached, 'Homepage data fetched');
+    if (!req.headers.authorization) {
+      response.setCache(30, 60, 120);
+    }
+    return response.send(res);
+  }
+
+  const Property = modules.properties?.model;
+  const Vehicle = modules.vehicles?.model;
+  const Grocery = modules.groceries?.model;
+  const Garment = modules.garments?.model;
+  const Jewellery = modules.jewellery?.model;
+  const Finance = modules.finance?.model;
+  const FinanceOffering = modules['finance-offerings']?.model;
+
   const realPhotoQuery = {
     $or: [
       { 'images.0': { $regex: '^https?://', $options: 'i' } },
@@ -139,41 +152,133 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     featuredWithPhotos,
     latestWithPhotos,
     latestVehicles,
+    latestGroceries,
+    latestGarments,
+    latestJewellery,
+    latestFinance,
+    financeOfferings,
+    totalProperties,
+    totalVehicles,
+    totalGroceries,
+    totalGarments,
+    totalJewellery,
+    totalFinance,
   ] = await Promise.all([
     // Featured properties with real photos (top 8)
-    Property.find({
-      featured: true,
-      status: { $in: ['approved', 'active'] },
-      availabilityStatus: { $ne: 'sold_out' },
-      ...realPhotoQuery,
-    })
-      .sort({ createdAt: -1 })
-      .limit(8)
-      .select(CARD_PROJECTION)
-      .lean(),
+    Property
+      ? Property.find({
+          featured: true,
+          status: { $in: ['approved', 'active'] },
+          availabilityStatus: { $ne: 'sold_out' },
+          ...realPhotoQuery,
+        })
+          .sort({ createdAt: -1 })
+          .limit(8)
+          .select(CARD_PROJECTION)
+          .lean()
+          .catch(() => [])
+      : [],
 
     // Latest properties with real photos (top 8)
-    Property.find({
-      status: { $in: ['approved', 'active'] },
-      availabilityStatus: { $ne: 'sold_out' },
-      ...realPhotoQuery,
-    })
-      .sort({ createdAt: -1 })
-      .limit(8)
-      .select(CARD_PROJECTION)
-      .lean(),
+    Property
+      ? Property.find({
+          status: { $in: ['approved', 'active'] },
+          availabilityStatus: { $ne: 'sold_out' },
+          ...realPhotoQuery,
+        })
+          .sort({ createdAt: -1 })
+          .limit(8)
+          .select(CARD_PROJECTION)
+          .lean()
+          .catch(() => [])
+      : [],
 
     // Latest vehicles (top 8)
-    Vehicle.find({ status: { $in: ['approved', 'active'] }, availabilityStatus: { $ne: 'sold_out' } })
-      .sort({ createdAt: -1 })
-      .limit(8)
-      .select(CARD_PROJECTION)
-      .lean().catch(() => []),
+    Vehicle
+      ? Vehicle.find({
+          status: { $in: ['approved', 'active'] },
+          availabilityStatus: { $ne: 'sold_out' },
+        })
+          .sort({ createdAt: -1 })
+          .limit(8)
+          .select(CARD_PROJECTION)
+          .lean()
+          .catch(() => [])
+      : [],
+
+    // Latest groceries (top 8)
+    Grocery
+      ? Grocery.find({
+          status: { $in: ['approved', 'active'] },
+          availabilityStatus: { $ne: 'sold_out' },
+        })
+          .sort({ createdAt: -1 })
+          .limit(8)
+          .select(CARD_PROJECTION)
+          .lean()
+          .catch(() => [])
+      : [],
+
+    // Latest garments (top 8)
+    Garment
+      ? Garment.find({
+          status: { $in: ['approved', 'active'] },
+          availabilityStatus: { $ne: 'sold_out' },
+        })
+          .sort({ createdAt: -1 })
+          .limit(8)
+          .select(CARD_PROJECTION)
+          .lean()
+          .catch(() => [])
+      : [],
+
+    // Latest jewellery (top 8)
+    Jewellery
+      ? Jewellery.find({
+          status: { $in: ['approved', 'active'] },
+          availabilityStatus: { $ne: 'sold_out' },
+        })
+          .sort({ createdAt: -1 })
+          .limit(8)
+          .select(CARD_PROJECTION)
+          .lean()
+          .catch(() => [])
+      : [],
+
+    // Latest finance (top 8)
+    Finance
+      ? Finance.find({
+          status: { $in: ['approved', 'active'] },
+          availabilityStatus: { $ne: 'sold_out' },
+        })
+          .sort({ createdAt: -1 })
+          .limit(8)
+          .select(CARD_PROJECTION)
+          .lean()
+          .catch(() => [])
+      : [],
+
+    // Finance offerings (top 8)
+    FinanceOffering
+      ? FinanceOffering.find({ isActive: { $ne: false } })
+          .sort({ createdAt: -1 })
+          .limit(8)
+          .lean()
+          .catch(() => [])
+      : [],
+
+    // Total counts
+    Property ? Property.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0) : 0,
+    Vehicle ? Vehicle.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0) : 0,
+    Grocery ? Grocery.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0) : 0,
+    Garment ? Garment.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0) : 0,
+    Jewellery ? Jewellery.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0) : 0,
+    Finance ? Finance.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0) : 0,
   ]);
 
   // Backfill featured if fewer than 6
   let featuredProperties = featuredWithPhotos;
-  if (featuredProperties.length < 6) {
+  if (Property && featuredProperties.length < 6) {
     const existingIds = new Set(featuredProperties.map((p) => String(p._id)));
     const backfill = await Property.find({
       featured: true,
@@ -184,13 +289,14 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(6 - featuredProperties.length)
       .select(CARD_PROJECTION)
-      .lean();
+      .lean()
+      .catch(() => []);
     featuredProperties = featuredProperties.concat(backfill);
   }
 
   // Backfill latest if fewer than 8
   let latestProperties = latestWithPhotos;
-  if (latestProperties.length < 8) {
+  if (Property && latestProperties.length < 8) {
     const existingIds = new Set(latestProperties.map((p) => String(p._id)));
     const backfill = await Property.find({
       status: { $in: ['approved', 'active'] },
@@ -200,37 +306,36 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(8 - latestProperties.length)
       .select(CARD_PROJECTION)
-      .lean();
+      .lean()
+      .catch(() => []);
     latestProperties = latestProperties.concat(backfill);
   }
-
-  // Stats — only active categories
-  const [totalProperties, totalVehicles] = await Promise.all([
-    Property.countDocuments({ status: { $in: ['approved', 'active'] } }),
-    Vehicle.countDocuments({ status: { $in: ['approved', 'active'] } }).catch(() => 0),
-  ]);
 
   const data = {
     featured: featuredProperties.map(formatPropertyCard),
     latestProperties: latestProperties.map(formatPropertyCard),
     latestVehicles,
-    // Disabled categories — return empty arrays to keep response shape stable
-    latestGroceries: [],
-    latestGarments: [],
-    latestJewellery: [],
-    latestFinance: [],
-    financeOfferings: [],
+    latestGroceries,
+    latestGarments,
+    latestJewellery,
+    latestFinance,
+    financeOfferings,
     stats: {
       totalProperties,
       totalVehicles,
-      totalGroceries: 0,
-      totalGarments: 0,
-      totalJewellery: 0,
-      totalFinance: 0,
+      totalGroceries,
+      totalGarments,
+      totalJewellery,
+      totalFinance,
     },
   };
 
-  new ApiResponse(200, data, 'Homepage data fetched').send(res);
+  homepageCache.set('homepage_data', data);
+  const response = new ApiResponse(200, data, 'Homepage data fetched');
+  if (!req.headers.authorization) {
+    response.setCache(30, 60, 120);
+  }
+  response.send(res);
 }));
 
 module.exports = router;
