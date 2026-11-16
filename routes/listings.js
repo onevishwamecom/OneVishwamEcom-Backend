@@ -695,8 +695,8 @@ const adminController = require('../controllers/adminController');
 router.patch('/:type/:id/images/reorder', protect, adminController.reorderListingImages);
 router.patch('/:id/images/reorder', protect, adminController.reorderListingImages);
 
-// PATCH /api/listings/:type/:id — update owned listing.
-router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
+// PATCH & PUT /api/listings/:type/:id — update owned listing.
+const updateListingHandler = asyncHandler(async (req, res) => {
   const mod = findModule(req.params.type);
   const item = await mod.model.findById(req.params.id);
   if (!item) throw new ApiError(404, 'Listing not found');
@@ -820,7 +820,10 @@ router.patch('/:type/:id', protect, asyncHandler(async (req, res) => {
     mod.service.cache.delete(String(req.params.id));
   }
   new ApiResponse(200, { item: normalizeListingItem(item) }, 'Listing updated successfully').send(res);
-}));
+});
+
+router.patch('/:type/:id', protect, updateListingHandler);
+router.put('/:type/:id', protect, updateListingHandler);
 
 // DELETE /api/listings/:type/:id — delete owned listing.
 router.delete('/:type/:id', protect, asyncHandler(async (req, res) => {

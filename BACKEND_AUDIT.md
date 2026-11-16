@@ -101,7 +101,25 @@ Mounted at `/product/:sector`, `/products/:sector`, `/sectors/:sector`, and `/v1
 
 ---
 
-## 3. Engineering Standards & Clean Architecture Verification
+## 3. Universal CRUD Operations Matrix Across All Categories
+
+Every single marketplace category natively supports all 8 core operations:
+
+| Category | List (`GET /`) | Get Single (`GET /:id`) | Create (`POST /`) | Update (`PUT & PATCH /:id`) | Delete (`DELETE /:id`) | Toggle Status (`PATCH /:id/status`) | My Listings (`GET /my`) | Similar Items (`GET /similar/:id`) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Properties** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Vehicles** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Groceries** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Garments** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Jewellery** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Electronics** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Bedding** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Finance** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Finance Offerings** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+---
+
+## 4. Engineering Standards & Clean Architecture Verification
 
 * **Zero Dead Code**: Removed proxy re-export files (`controllers/propertyController.js` and `models/Property.js`). All sector assets live 100% inside `modules/<sector>/`. All external imports updated to `modules/properties/model`.
 * **Standardized Response Envelope**: Every successful response uses `ApiResponse`:

@@ -548,6 +548,7 @@ router.get('/:id', (req, res, next) => {
 });
 
 router.put('/:id', protect, upload.array('images', 10), updateRules, validate, update);
+router.patch('/:id', protect, upload.array('images', 10), updateRules, validate, update);
 router.delete('/:id', protect, remove);
 
 module.exports = router;

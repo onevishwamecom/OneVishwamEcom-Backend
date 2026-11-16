@@ -9,9 +9,11 @@ const router = express.Router();
 router.get('/', getAll);
 router.get('/my', protect, getMy);
 router.get('/similar/:id', getSimilar);
+router.get('/:id/similar', getSimilar);
 router.get('/:id', getById);
 router.post('/', protect, createRules, validate, create);
 router.put('/:id', protect, updateRules, validate, update);
+router.patch('/:id', protect, updateRules, validate, update);
 router.delete('/:id', protect, remove);
 router.patch('/:id/status', protect, toggleStatus);
 

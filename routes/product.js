@@ -102,6 +102,12 @@ router.get('/:sector/my', protect, asyncHandler(async (req, res, next) => {
   next();
 }));
 
+router.get('/:sector/similar/:id', optionalAuth, asyncHandler(async (req, res, next) => {
+  const ctrl = req.sectorModule.controller;
+  if (ctrl.getSimilar) return ctrl.getSimilar(req, res, next);
+  next();
+}));
+
 router.get('/:sector/:id', optionalAuth, asyncHandler(async (req, res, next) => {
   const ctrl = req.sectorModule.controller;
   if (ctrl.getOne) return ctrl.getOne(req, res, next);
@@ -121,6 +127,12 @@ router.put('/:sector/:id', protect, asyncHandler(async (req, res, next) => {
   next();
 }));
 
+router.patch('/:sector/:id', protect, asyncHandler(async (req, res, next) => {
+  const ctrl = req.sectorModule.controller;
+  if (ctrl.update) return ctrl.update(req, res, next);
+  next();
+}));
+
 router.delete('/:sector/:id', protect, asyncHandler(async (req, res, next) => {
   const ctrl = req.sectorModule.controller;
   if (ctrl.delete) return ctrl.delete(req, res, next);
@@ -129,6 +141,12 @@ router.delete('/:sector/:id', protect, asyncHandler(async (req, res, next) => {
 }));
 
 router.patch('/:sector/:id/status', protect, asyncHandler(async (req, res, next) => {
+  const ctrl = req.sectorModule.controller;
+  if (ctrl.toggleStatus) return ctrl.toggleStatus(req, res, next);
+  next();
+}));
+
+router.patch('/:sector/:id/toggle-status', protect, asyncHandler(async (req, res, next) => {
   const ctrl = req.sectorModule.controller;
   if (ctrl.toggleStatus) return ctrl.toggleStatus(req, res, next);
   next();

@@ -46,6 +46,7 @@ class BaseController {
     this.list = this.list.bind(this);
     this.getOne = this.getOne.bind(this);
     this.getMy = this.getMy.bind(this);
+    this.getSimilar = this.getSimilar.bind(this);
     this.create = this.create.bind(this);
     this.update = this.update.bind(this);
     this.delete = this.delete.bind(this);
@@ -201,6 +202,47 @@ class BaseController {
       response.setCache(30, 60, 120);
     }
     response.send(res);
+  });
+
+  /**
+   * GET /similar/:id or /:id/similar - Similar items by subcategory/category
+   */
+  getSimilar = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError(400, 'Invalid item ID format');
+    }
+
+    const current = await this.model.findById(id).lean();
+    if (!current) {
+      throw new ApiError(404, 'Item not found');
+    }
+
+    const filter = {
+      _id: { $ne: current._id },
+      status: { $in: ['approved', 'active', 'available'] },
+      availabilityStatus: { $ne: 'sold_out' },
+    };
+
+    if (current.subcategory) {
+      filter.subcategory = current.subcategory;
+    } else if (current.category) {
+      filter.category = current.category;
+    } else if (current.propertyType) {
+      filter.propertyType = current.propertyType;
+    }
+
+    if (current.city) {
+      filter.city = current.city;
+    }
+
+    let items = await this.model.find(filter).limit(4).sort({ createdAt: -1 }).lean();
+    if (items.length === 0 && (current.category || current.propertyType)) {
+      delete filter.city;
+      items = await this.model.find(filter).limit(4).sort({ createdAt: -1 }).lean();
+    }
+
+    new ApiResponse(200, { items }, 'Similar items fetched').send(res);
   });
 
   /**
@@ -390,11 +432,15 @@ function createCRUDController(options) {
   const controller = new BaseController(options);
   return {
     getAll: controller.list,
+    list: controller.list,
     getById: controller.getOne,
+    getOne: controller.getOne,
     getMy: controller.getMy,
+    getSimilar: controller.getSimilar,
     create: controller.create,
     update: controller.update,
     remove: controller.delete,
+    delete: controller.delete,
     toggleStatus: controller.toggleStatus,
     controller,
   };

@@ -439,6 +439,11 @@ module.exports = {
   uploadFloorPlan,
   deleteFloorPlanImage,
   deleteFloorPlanPdf,
+  // Canonical CRUD method aliases for universal BaseController conformity
+  list: getAll,
+  getOne: getById,
+  getMy: getMyProperties,
+  delete: remove,
   // Aliases for full legacy compatibility
   getProperties: getAll,
   getPropertyById: getById,
