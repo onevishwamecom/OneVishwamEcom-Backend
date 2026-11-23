@@ -57,6 +57,7 @@ const options = {
         description:
           'Multi-sector marketplace products & listings (properties, vehicles, automobiles, garments, groceries, jewellery, electronics, bedding, finance)',
       },
+      { name: 'Categories', description: 'Programmatic marketplace categories and ecosystem sectors registry' },
       { name: 'Listings', description: 'Seller listing CRUD' },
       { name: 'Wishlist', description: 'Saved listings' },
       { name: 'Uploads', description: 'Image uploads' },

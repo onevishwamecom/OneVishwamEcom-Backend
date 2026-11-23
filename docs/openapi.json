@@ -7,12 +7,12 @@
   },
   "servers": [
     {
-      "url": "https://asia-south1-onevishwam.cloudfunctions.net/api",
-      "description": "Production (Cloud Functions)"
-    },
-    {
       "url": "http://localhost:5001/api",
       "description": "Local development"
+    },
+    {
+      "url": "https://asia-south1-onevishwam.cloudfunctions.net/api",
+      "description": "Production (Cloud Functions)"
     }
   ],
   "tags": [
@@ -27,6 +27,10 @@
     {
       "name": "Products",
       "description": "Multi-sector marketplace products & listings (properties, vehicles, automobiles, garments, groceries, jewellery, electronics, bedding, finance)"
+    },
+    {
+      "name": "Categories",
+      "description": "Programmatic marketplace categories and ecosystem sectors registry"
     },
     {
       "name": "Listings",
@@ -3162,6 +3166,77 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "Fetch all programmatic marketplace categories & ecosystem sectors",
+        "description": "Returns the authoritative programmatic category registry for OneVishwam. Categories are maintained in code to ensure strict schema adherence and zero drift. Supports filtering by status or featured flag, and optional live MongoDB stats.\n",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "active",
+                "coming-soon"
+              ]
+            },
+            "description": "Filter categories by lifecycle status (default 'all')"
+          },
+          {
+            "in": "query",
+            "name": "featured",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Return only featured categories"
+          },
+          {
+            "in": "query",
+            "name": "includeStats",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Attach live listing counts from MongoDB"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of categories retrieved successfully"
+          }
+        }
+      }
+    },
+    "/categories/{idOrSlug}": {
+      "get": {
+        "tags": [
+          "Categories"
+        ],
+        "summary": "Fetch a single category by ID, slug, or alias",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "idOrSlug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category found"
+          },
+          "404": {
+            "description": "Category not found"
           }
         }
       }
