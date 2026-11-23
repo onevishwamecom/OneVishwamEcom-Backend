@@ -18,8 +18,15 @@ const propertyRequirementRoutes = require('../modules/properties/requirements');
 const bulkListingRoutes = require('./bulkListing');
 const visitorRoutes = require('./visitors');
 const announcementRoutes = require('./announcements');
+const categoryRoutes = require('./categories');
 
 const router = express.Router();
+
+// Programmatic Category Registry & Endpoints
+router.use('/categories', categoryRoutes);
+router.use('/v1/categories', categoryRoutes);
+router.use('/category', categoryRoutes);
+router.use('/v1/category', categoryRoutes);
 
 // Top Ribbon Announcements / Notifications
 router.use('/announcements', announcementRoutes);

@@ -11,6 +11,7 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "uploads/**",
+        "docs/**",
         ".env",
         ".env.*",
         ".env.local",
@@ -37,5 +38,16 @@
       "enabled": true,
       "port": 4000
     }
+  },
+  "hosting": {
+    "site": "onevishwam-docs",
+    "public": "docs",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "/openapi.json",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
   }
 }
